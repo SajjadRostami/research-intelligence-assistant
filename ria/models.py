@@ -96,6 +96,7 @@ class BenchmarkMetric(BaseModel):
     """
     name: str
     description: str | None = None
+    category: str | None = None
 
 
 class CoverageCell(BaseModel):

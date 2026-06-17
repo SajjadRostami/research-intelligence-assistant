@@ -1,0 +1,11 @@
+{
+  "topic": "Position Based Dynamics",
+  "queries": [
+    {
+      "query_string": "Position Based Dynamics",
+      "source": "SemanticScholarAdapter",
+      "timestamp": "2026-06-17T20:53:05.368626"
+    }
+  ],
+  "raw_items": []
+}

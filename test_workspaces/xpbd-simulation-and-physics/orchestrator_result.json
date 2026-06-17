@@ -1,0 +1,53 @@
+{
+  "topic": "XPBD Simulation and Physics",
+  "queries": [
+    {
+      "query_string": "XPBD Simulation and Physics",
+      "source": "SerpAPIPatentAdapter",
+      "timestamp": "2026-06-17T20:52:29.977752"
+    },
+    {
+      "query_string": "XPBD Simulation and Physics",
+      "source": "SemanticScholarAdapter",
+      "timestamp": "2026-06-17T20:52:29.977774"
+    }
+  ],
+  "raw_items": [
+    {
+      "title": "Position Based Dynamics",
+      "source_type": "paper",
+      "source_url": "https://example.com/paper1",
+      "publication_date": "2020-05-15",
+      "author_or_assignee": "John Doe",
+      "relevance_explanation": "Foundational work on position-based simulation",
+      "confidence_level": "High",
+      "doi": "10.1234/example.1",
+      "patent_number": null,
+      "raw_adapter_source": "SemanticScholarAdapter"
+    },
+    {
+      "title": "Extended Position Based Dynamics Method",
+      "source_type": "patent",
+      "source_url": "https://patents.google.com/patent/US1234567",
+      "publication_date": "2021-03-20",
+      "author_or_assignee": "Tech Corp",
+      "relevance_explanation": "Patent covering XPBD implementation",
+      "confidence_level": "Medium",
+      "doi": null,
+      "patent_number": "US1234567",
+      "raw_adapter_source": "SerpAPIPatentAdapter"
+    },
+    {
+      "title": "Real-time Physics Simulation using XPBD",
+      "source_type": "paper",
+      "source_url": "https://example.com/paper2",
+      "publication_date": "2022-08-10",
+      "author_or_assignee": "Jane Smith",
+      "relevance_explanation": "Practical applications of XPBD in real-time systems",
+      "confidence_level": "High",
+      "doi": "10.1234/example.2",
+      "patent_number": null,
+      "raw_adapter_source": "SemanticScholarAdapter"
+    }
+  ]
+}

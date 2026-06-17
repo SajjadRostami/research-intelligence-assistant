@@ -1,0 +1,137 @@
+{
+  "topic": "XPBD soft body simulation algorithm",
+  "queries": [
+    {
+      "query_string": "XPBD soft body simulation algorithm",
+      "source": "SemanticScholarAdapter",
+      "timestamp": "2026-06-17T21:40:06.093292"
+    },
+    {
+      "query_string": "XPBD soft body simulation algorithm",
+      "source": "SerpAPIPatentAdapter",
+      "timestamp": "2026-06-17T21:40:06.149948"
+    }
+  ],
+  "raw_items": [
+    {
+      "title": "Real-Time Simulation of Elastic Body",
+      "source_type": "patent",
+      "source_url": "https://patentimages.storage.googleapis.com/93/59/2d/40e6b29bbaac6f/US20230061175A1.pdf",
+      "publication_date": "2023-03-02",
+      "author_or_assignee": "Mimyk Medical Simulations Private Limited",
+      "relevance_explanation": "An elastic body is modelled as a plurality of models of particles and models of geometric elements. Each particle model has a position attribute. Each geometric element has a boundary defined by two or more of the particles as nodes of the geometric element, nodes being points shared with …",
+      "confidence_level": "High",
+      "doi": null,
+      "patent_number": "patent/US20230061175A1/en",
+      "raw_adapter_source": "serpapi_patents"
+    },
+    {
+      "title": "A Real-Time Trajectory Tracking Control Method for Rope-Driven Soft Robotic Arm",
+      "source_type": "patent",
+      "source_url": "https://patents.google.com/patent/patent/CN116277021B/en",
+      "publication_date": "2026-03-24",
+      "author_or_assignee": "大连理工大学",
+      "relevance_explanation": "The invention provides a real-time track tracking control method for a rope-driven soft mechanical arm, and belongs to the technical field of motion control of soft robots. Firstly, establishing an objective function of a track tracking optimal control problem according to a target track, secondly …",
+      "confidence_level": "High",
+      "doi": null,
+      "patent_number": "patent/CN116277021B/en",
+      "raw_adapter_source": "serpapi_patents"
+    },
+    {
+      "title": "Simulator, simulation data generation method, and simulator system",
+      "source_type": "patent",
+      "source_url": "https://patentimages.storage.googleapis.com/b1/34/62/a0e4f62fae755b/WO2023171413A1.pdf",
+      "publication_date": "2023-09-14",
+      "author_or_assignee": "ソニーグループ株式会社",
+      "relevance_explanation": "A simulator (1) is provided with a processing unit (2) that meshes and models a soft-bodied object (O1) as a plurality of polyhedrons, at each apex of which a particle (p) is disposed, such that the soft-bodied object (O1) has a plurality of particles (p), and using a condition for minimizing the …",
+      "confidence_level": "High",
+      "doi": null,
+      "patent_number": "patent/WO2023171413A1/en",
+      "raw_adapter_source": "serpapi_patents"
+    },
+    {
+      "title": "A real-time snow simulation method based on position dynamics with integrated …",
+      "source_type": "patent",
+      "source_url": "https://patentimages.storage.googleapis.com/e8/53/f3/ec051934c10d97/CN118410742A.pdf",
+      "publication_date": "2024-07-30",
+      "author_or_assignee": "北京航空航天大学",
+      "relevance_explanation": "The present invention is a real-time snow simulation method based on position dynamics with fusion constraints. At present, snow simulation has the problem of low efficiency due to the loss of physical information using simulation maps and pure calculation of physical forces. The present invention …",
+      "confidence_level": "High",
+      "doi": null,
+      "patent_number": "patent/CN118410742A/en",
+      "raw_adapter_source": "serpapi_patents"
+    },
+    {
+      "title": "Methods for realistic and efficient simulation of moving objects",
+      "source_type": "patent",
+      "source_url": "https://patentimages.storage.googleapis.com/63/7a/da/1af33c7327cfd9/US20220151701A1.pdf",
+      "publication_date": "2022-05-19",
+      "author_or_assignee": "Virtamed Ag",
+      "relevance_explanation": "A method is proposed to simulate a moving rod with a changing orientation such as bending or twisting in a real-time surgical threading simulation application. A Projective Dynamics local-global solver is adapted with discretized Cosserat object position and orientation constraints and potentials …",
+      "confidence_level": "High",
+      "doi": null,
+      "patent_number": "patent/US20220151701A1/en",
+      "raw_adapter_source": "serpapi_patents"
+    },
+    {
+      "title": "Methods for realistic and efficient simulation of moving objects",
+      "source_type": "patent",
+      "source_url": "https://patentimages.storage.googleapis.com/99/5a/77/472875a7e80df5/US20190108300A1.pdf",
+      "publication_date": "2019-04-11",
+      "author_or_assignee": "Virtamed Ag",
+      "relevance_explanation": "A method is proposed to simulate a moving object with a changing orientation such as bending or twisting in a real-time computer graphics application. A Projective Dynamics local-global solver is adapted with discretized Cosserat object position and orientation constraints and potentials for the …",
+      "confidence_level": "High",
+      "doi": null,
+      "patent_number": "patent/US20190108300A1/en",
+      "raw_adapter_source": "serpapi_patents"
+    },
+    {
+      "title": "Physical animation generation method and device based on Unreal engine",
+      "source_type": "patent",
+      "source_url": "https://patentimages.storage.googleapis.com/9e/de/45/551ca833ea4975/CN116934922A.pdf",
+      "publication_date": "2023-10-24",
+      "author_or_assignee": "北京幻想美人鱼科技有限公司",
+      "relevance_explanation": "The embodiment of the application provides a physical animation generation method based on a Unreal engine, which comprises the following steps: a physical asset of the target object is acquired. And analyzing the physical assets to obtain physical configuration information. And storing the …",
+      "confidence_level": "High",
+      "doi": null,
+      "patent_number": "patent/CN116934922A/en",
+      "raw_adapter_source": "serpapi_patents"
+    },
+    {
+      "title": "A GPU parallel fitting simulation method based on constraint projection",
+      "source_type": "patent",
+      "source_url": "https://patentimages.storage.googleapis.com/01/7a/ee/93c9518595150d/CN112862957A.pdf",
+      "publication_date": "2021-05-28",
+      "author_or_assignee": "南京大学",
+      "relevance_explanation": "The invention provides a GPU parallel fitting simulation method based on constrained projection, which is characterized in that a binary radix tree is parallelly constructed on a human body model through Morton codes to form a BVH, and a clothing vertex is directly used for traversing the BVH to …",
+      "confidence_level": "High",
+      "doi": null,
+      "patent_number": "patent/CN112862957A/en",
+      "raw_adapter_source": "serpapi_patents"
+    },
+    {
+      "title": "Method used to simulate contact",
+      "source_type": "patent",
+      "source_url": "https://patentimages.storage.googleapis.com/13/60/34/f1d2fc63538f41/CN114139333A.pdf",
+      "publication_date": "2022-03-04",
+      "author_or_assignee": "辉达公司",
+      "relevance_explanation": "Methods for simulating contact are disclosed, and in particular, apparatus, systems, and techniques applied to force-based (e.g., raw) equations for object simulation are disclosed. In at least one embodiment, the update to the force-based formula is determined by solving constraints to be …",
+      "confidence_level": "High",
+      "doi": null,
+      "patent_number": "patent/CN114139333A/en",
+      "raw_adapter_source": "serpapi_patents"
+    },
+    {
+      "title": "A clothing model processing method, device, electronic device and storage …",
+      "source_type": "patent",
+      "source_url": "https://patentimages.storage.googleapis.com/9f/ae/61/336e09478843e4/CN120227637A.pdf",
+      "publication_date": "2025-07-01",
+      "author_or_assignee": "网易（杭州）网络有限公司",
+      "relevance_explanation": "The present application discloses a clothing model processing method, device, electronic device and storage medium, which can obtain a target clothing model to be subjected to a binding process, and a template file of a target reference clothing model, wherein the template file includes a clothing …",
+      "confidence_level": "High",
+      "doi": null,
+      "patent_number": "patent/CN120227637A/en",
+      "raw_adapter_source": "serpapi_patents"
+    }
+  ]
+}

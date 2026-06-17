@@ -1,0 +1,44 @@
+{
+  "papers": [],
+  "patents": [
+    {
+      "title": "Methods for realistic and efficient simulation of moving objects",
+      "source_type": "patent",
+      "source_url": "https://patentimages.storage.googleapis.com/63/7a/da/1af33c7327cfd9/US20220151701A1.pdf",
+      "publication_date": "2022-05-19",
+      "author_or_assignee": "Virtamed Ag",
+      "relevance_explanation": "Highly relevant to XPBD soft body simulation. The source directly addresses Projective Dynamics (which is the foundation of XPBD), discusses constraint-based simulation with local-global solvers, and applies these methods to deformable object simulation. The focus on position and orientation constraints aligns with XPBD methodology. Minor deduction because it's application-specific (surgical simulation) rather than a general XPBD algorithm paper, but the core techniques are directly applicable.",
+      "confidence_level": "High",
+      "doi": null,
+      "patent_number": "patent/US20220151701A1/en",
+      "raw_adapter_source": "serpapi_patents",
+      "relevance_score": 0.85
+    },
+    {
+      "title": "A real-time snow simulation method based on position dynamics with integrated …",
+      "source_type": "patent",
+      "source_url": "https://patentimages.storage.googleapis.com/e8/53/f3/ec051934c10d97/CN118410742A.pdf",
+      "publication_date": "2024-07-30",
+      "author_or_assignee": "北京航空航天大学",
+      "relevance_explanation": "This patent is highly relevant to XPBD soft body simulation as it explicitly uses 'position dynamics' (the core principle of XPBD - Extended Position Based Dynamics) with integrated constraints for real-time simulation. While the application domain is snow simulation rather than general soft bodies, the underlying algorithmic approach directly addresses position-based constraint solving, which is fundamental to XPBD. The focus on real-time performance and constraint fusion also aligns with XPBD methodology. The relevance is not perfect (1.0) because it's domain-specific to snow rather than a general XPBD framework paper.",
+      "confidence_level": "High",
+      "doi": null,
+      "patent_number": "patent/CN118410742A/en",
+      "raw_adapter_source": "serpapi_patents",
+      "relevance_score": 0.75
+    },
+    {
+      "title": "Simulator, simulation data generation method, and simulator system",
+      "source_type": "patent",
+      "source_url": "https://patentimages.storage.googleapis.com/b1/34/62/a0e4f62fae755b/WO2023171413A1.pdf",
+      "publication_date": "2023-09-14",
+      "author_or_assignee": "ソニーグループ株式会社",
+      "relevance_explanation": "The patent describes a soft body simulator using particle-based mesh modeling with constraint minimization, which is directly relevant to XPBD (Extended Position Based Dynamics) algorithms. The description mentions particles at mesh vertices and constraint-based simulation, core concepts of XPBD. However, the abstract is incomplete and doesn't explicitly mention XPBD or position-based dynamics, preventing a higher score. The relevance is strong but not definitively confirmed without full documentation.",
+      "confidence_level": "High",
+      "doi": null,
+      "patent_number": "patent/WO2023171413A1/en",
+      "raw_adapter_source": "serpapi_patents",
+      "relevance_score": 0.7
+    }
+  ]
+}

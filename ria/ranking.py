@@ -153,9 +153,9 @@ class RankingEngine:
                     temperature=0.3,  # Lower temperature for more consistent scoring
                 )
 
-                # Create scored item
+                # Create scored item (exclude relevance_explanation to avoid duplicate)
                 scored_item = ScoredSourceItem(
-                    **item.model_dump(),
+                    **item.model_dump(exclude={'relevance_explanation'}),
                     relevance_score=relevance.score,
                     relevance_explanation=relevance.reasoning,
                 )
@@ -165,7 +165,7 @@ class RankingEngine:
                 # If scoring fails, assign a default low score
                 print(f"Warning: Failed to score item '{item.title}': {e}")
                 scored_item = ScoredSourceItem(
-                    **item.model_dump(),
+                    **item.model_dump(exclude={'relevance_explanation'}),
                     relevance_score=0.0,
                     relevance_explanation=f"Scoring failed: {str(e)}",
                 )

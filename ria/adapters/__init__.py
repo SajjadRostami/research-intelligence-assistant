@@ -9,14 +9,17 @@ from ria.adapters.base import SearchAdapter
 from ria.adapters.google_patents import GooglePatentsAdapter
 from ria.adapters.mock_patent import MockPatentAdapter
 from ria.adapters.patentsview import PatentsViewAdapter
+from ria.adapters.serpapi_patents import SerpAPIPatentAdapter
 
 # GooglePatentsAdapter is deprecated - Google Patents renders results with JavaScript
 # PatentsViewAdapter is deprecated - PatentsView API has been shut down (moved to USPTO)
-# MockPatentAdapter is for MVP/testing - replace with BigQuery or Lens.org for production
+# MockPatentAdapter is for MVP/testing - fallback for development
+# SerpAPIPatentAdapter is the recommended production adapter for MVP
 
 __all__ = [
     "SearchAdapter",
     "GooglePatentsAdapter",
     "PatentsViewAdapter",
     "MockPatentAdapter",
+    "SerpAPIPatentAdapter",
 ]

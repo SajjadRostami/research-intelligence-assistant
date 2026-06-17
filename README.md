@@ -1,5 +1,3 @@
-# research-intelligence-assistant
-
 # Research Intelligence Assistant (RIA)
 
 ## Overview

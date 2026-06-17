@@ -6,5 +6,6 @@ source-specific query construction, HTTP requests, and result parsing.
 """
 
 from ria.adapters.base import SearchAdapter
+from ria.adapters.google_patents import GooglePatentsAdapter
 
-__all__ = ["SearchAdapter"]
+__all__ = ["SearchAdapter", "GooglePatentsAdapter"]

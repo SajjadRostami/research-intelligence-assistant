@@ -1,0 +1,689 @@
+```html
+<!-- Save this file as index.html in the root of your GitHub repository -->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Research Intelligence Assistant</title>
+
+    <style>
+        :root {
+            --bg: #07111f;
+            --bg-soft: #0f1b2d;
+            --card: #111f33;
+            --border: #22344d;
+            --text: #f8fafc;
+            --muted: #9fb0c7;
+            --accent: #38bdf8;
+            --accent-2: #a78bfa;
+            --green: #22c55e;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Inter, Arial, Helvetica, sans-serif;
+            background: radial-gradient(circle at top left, #12345a 0, #07111f 35%, #050914 100%);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        a {
+            color: inherit;
+        }
+
+        .container {
+            width: min(1120px, 90%);
+            margin: auto;
+        }
+
+        nav {
+            padding: 24px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 800;
+            letter-spacing: 0.3px;
+        }
+
+        .logo-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            display: grid;
+            place-items: center;
+            color: #020617;
+            font-weight: 900;
+        }
+
+        .nav-links a {
+            color: var(--muted);
+            text-decoration: none;
+            margin-left: 24px;
+            font-size: 14px;
+        }
+
+        .hero {
+            padding: 80px 0 90px;
+            display: grid;
+            grid-template-columns: 1.05fr 0.95fr;
+            gap: 50px;
+            align-items: center;
+        }
+
+        .badge-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 24px;
+        }
+
+        .badge {
+            padding: 7px 12px;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            color: var(--muted);
+            font-size: 13px;
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        h1 {
+            font-size: clamp(42px, 6vw, 72px);
+            line-height: 1.05;
+            margin: 0 0 24px;
+            letter-spacing: -1.8px;
+        }
+
+        .hero p {
+            font-size: 20px;
+            color: var(--muted);
+            max-width: 720px;
+            margin-bottom: 32px;
+        }
+
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 22px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 700;
+            transition: 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: #03111f;
+        }
+
+        .btn-secondary {
+            border: 1px solid var(--border);
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .hero-visual {
+            position: relative;
+            background: linear-gradient(180deg, rgba(56, 189, 248, 0.14), rgba(167, 139, 250, 0.08));
+            border: 1px solid var(--border);
+            border-radius: 28px;
+            padding: 28px;
+            box-shadow: 0 30px 90px rgba(0, 0, 0, 0.35);
+        }
+
+        .visual-card {
+            background: rgba(7, 17, 31, 0.88);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 22px;
+            margin-bottom: 18px;
+        }
+
+        .visual-card.small {
+            width: 82%;
+            margin-left: auto;
+        }
+
+        .visual-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 800;
+            margin-bottom: 14px;
+        }
+
+        .bar {
+            height: 10px;
+            background: #1e2f48;
+            border-radius: 999px;
+            overflow: hidden;
+            margin: 12px 0;
+        }
+
+        .bar span {
+            display: block;
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--accent-2));
+            border-radius: inherit;
+        }
+
+        section {
+            padding: 78px 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .section-header {
+            max-width: 760px;
+            margin-bottom: 38px;
+        }
+
+        h2 {
+            font-size: clamp(30px, 4vw, 44px);
+            margin: 0 0 14px;
+            letter-spacing: -0.8px;
+        }
+
+        .section-header p {
+            color: var(--muted);
+            font-size: 18px;
+            margin: 0;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 22px;
+        }
+
+        .card {
+            background: rgba(17, 31, 51, 0.78);
+            border: 1px solid var(--border);
+            border-radius: 22px;
+            padding: 26px;
+        }
+
+        .icon {
+            width: 46px;
+            height: 46px;
+            border-radius: 14px;
+            display: grid;
+            place-items: center;
+            background: rgba(56, 189, 248, 0.12);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            color: var(--accent);
+            margin-bottom: 18px;
+        }
+
+        .card h3 {
+            margin: 0 0 10px;
+            font-size: 21px;
+        }
+
+        .card p {
+            margin: 0;
+            color: var(--muted);
+        }
+
+        .workflow {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 14px;
+        }
+
+        .step {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 20px;
+            text-align: center;
+            position: relative;
+        }
+
+        .step-number {
+            width: 34px;
+            height: 34px;
+            margin: 0 auto 12px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            color: #020617;
+            font-weight: 900;
+            display: grid;
+            place-items: center;
+        }
+
+        .step strong {
+            display: block;
+            margin-bottom: 6px;
+        }
+
+        .step span {
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .architecture {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border);
+            border-radius: 28px;
+            padding: 34px;
+            overflow-x: auto;
+        }
+
+        .diagram {
+            min-width: 780px;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 22px;
+            align-items: center;
+        }
+
+        .diagram-box {
+            background: #0c1728;
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 22px;
+            text-align: center;
+        }
+
+        .diagram-box strong {
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .diagram-box span {
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .arrow {
+            text-align: center;
+            color: var(--accent);
+            font-size: 30px;
+            font-weight: 900;
+        }
+
+        .tech {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+        }
+
+        .tech-item {
+            padding: 14px 18px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            color: var(--muted);
+            font-weight: 700;
+        }
+
+        .roadmap {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 18px;
+        }
+
+        .roadmap-item {
+            display: flex;
+            gap: 14px;
+            padding: 18px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+        }
+
+        .check {
+            color: var(--green);
+            font-weight: 900;
+        }
+
+        footer {
+            padding: 42px 0;
+            color: var(--muted);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        @media (max-width: 900px) {
+            .hero {
+                grid-template-columns: 1fr;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .workflow {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .roadmap {
+                grid-template-columns: 1fr;
+            }
+
+            .nav-links {
+                display: none;
+            }
+        }
+
+        @media (max-width: 560px) {
+            .workflow {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <nav>
+            <div class="logo">
+                <div class="logo-icon">RIA</div>
+                <span>Research Intelligence Assistant</span>
+            </div>
+
+            <div class="nav-links">
+                <a href="#features">Features</a>
+                <a href="#workflow">Workflow</a>
+                <a href="#architecture">Architecture</a>
+                <a href="#roadmap">Roadmap</a>
+            </div>
+        </nav>
+
+        <main class="hero">
+            <div>
+                <div class="badge-row">
+                    <span class="badge">Python</span>
+                    <span class="badge">LLM Workflow</span>
+                    <span class="badge">Benchmarking</span>
+                    <span class="badge">Markdown Reports</span>
+                </div>
+
+                <h1>AI-powered research intelligence for faster benchmark reports.</h1>
+
+                <p>
+                    Research Intelligence Assistant is a Python-based tool that transforms a research topic
+                    into a structured benchmark report by collecting, ranking, and organizing scientific papers,
+                    patents, and commercial solution references.
+                </p>
+
+                <div class="actions">
+                    <a class="btn btn-primary" href="https://github.com/SajjadRostami/research-intelligence-assistant">
+                        View GitHub Repository →
+                    </a>
+                    <a class="btn btn-secondary" href="#workflow">
+                        See Workflow
+                    </a>
+                </div>
+            </div>
+
+            <div class="hero-visual">
+                <div class="visual-card">
+                    <div class="visual-title">🔎 Research Topic Analysis</div>
+                    <div class="bar"><span style="width: 92%"></span></div>
+                    <div class="bar"><span style="width: 74%"></span></div>
+                    <div class="bar"><span style="width: 86%"></span></div>
+                </div>
+
+                <div class="visual-card small">
+                    <div class="visual-title">🤖 LLM Relevance Ranking</div>
+                    <div class="bar"><span style="width: 88%"></span></div>
+                    <div class="bar"><span style="width: 68%"></span></div>
+                </div>
+
+                <div class="visual-card">
+                    <div class="visual-title">📊 Benchmark Report Generated</div>
+                    <div class="bar"><span style="width: 96%"></span></div>
+                    <div class="bar"><span style="width: 82%"></span></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <section id="features">
+        <div class="container">
+            <div class="section-header">
+                <h2>Core Features</h2>
+                <p>
+                    Designed as a clean MVP for research collection, AI-assisted ranking,
+                    human validation, and structured report generation.
+                </p>
+            </div>
+
+            <div class="grid">
+                <div class="card">
+                    <div class="icon">🔎</div>
+                    <h3>Topic-Based Search</h3>
+                    <p>Accepts a research topic from the command line and uses it to collect relevant information.</p>
+                </div>
+
+                <div class="card">
+                    <div class="icon">📚</div>
+                    <h3>Research Collection</h3>
+                    <p>Collects references from scientific papers, patents, and commercial solution sources.</p>
+                </div>
+
+                <div class="card">
+                    <div class="icon">🤖</div>
+                    <h3>LLM-Based Ranking</h3>
+                    <p>Uses AI to evaluate relevance and prioritize the most useful results for the report.</p>
+                </div>
+
+                <div class="card">
+                    <div class="icon">✅</div>
+                    <h3>Human Review</h3>
+                    <p>Allows the user to approve, reject, or edit selected results before final generation.</p>
+                </div>
+
+                <div class="card">
+                    <div class="icon">📊</div>
+                    <h3>Benchmark Table</h3>
+                    <p>Organizes findings into clear comparison tables for easier analysis and decision-making.</p>
+                </div>
+
+                <div class="card">
+                    <div class="icon">📝</div>
+                    <h3>Markdown Report</h3>
+                    <p>Generates a structured local report with summary, findings, benchmark metrics, and references.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="workflow">
+        <div class="container">
+            <div class="section-header">
+                <h2>Workflow</h2>
+                <p>
+                    A simple pipeline from user input to a structured benchmark report.
+                </p>
+            </div>
+
+            <div class="workflow">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <strong>Topic</strong>
+                    <span>User enters a research topic</span>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <strong>Search</strong>
+                    <span>The system searches selected sources</span>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <strong>Collect</strong>
+                    <span>Papers, patents, and solutions are gathered</span>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <strong>Rank</strong>
+                    <span>LLM evaluates result relevance</span>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">5</div>
+                    <strong>Review</strong>
+                    <span>User validates the selected results</span>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">6</div>
+                    <strong>Report</strong>
+                    <span>Markdown benchmark report is generated</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="architecture">
+        <div class="container">
+            <div class="section-header">
+                <h2>System Architecture</h2>
+                <p>
+                    The MVP is organized around a lightweight CLI workflow with modular research,
+                    ranking, and report-rendering components.
+                </p>
+            </div>
+
+            <div class="architecture">
+                <div class="diagram">
+                    <div class="diagram-box">
+                        <strong>CLI Interface</strong>
+                        <span>Receives research topic and user validation</span>
+                    </div>
+
+                    <div class="arrow">→</div>
+
+                    <div class="diagram-box">
+                        <strong>Research Engine</strong>
+                        <span>Searches papers, patents, and solution references</span>
+                    </div>
+
+                    <div class="diagram-box">
+                        <strong>LLM Ranking Layer</strong>
+                        <span>Scores relevance and extracts benchmark signals</span>
+                    </div>
+
+                    <div class="arrow">→</div>
+
+                    <div class="diagram-box">
+                        <strong>Report Renderer</strong>
+                        <span>Creates executive summary, benchmark table, and references</span>
+                    </div>
+
+                    <div class="diagram-box">
+                        <strong>Local Storage</strong>
+                        <span>Saves generated Markdown report and supporting outputs</span>
+                    </div>
+
+                    <div class="arrow">→</div>
+
+                    <div class="diagram-box">
+                        <strong>Benchmark Report</strong>
+                        <span>Structured output ready for review and sharing</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="tech">
+        <div class="container">
+            <div class="section-header">
+                <h2>Technology Stack</h2>
+                <p>
+                    Built with a practical MVP-first approach using Python and AI-assisted analysis.
+                </p>
+            </div>
+
+            <div class="tech">
+                <div class="tech-item">Python</div>
+                <div class="tech-item">Command Line Interface</div>
+                <div class="tech-item">LLM Ranking</div>
+                <div class="tech-item">Semantic Scholar</div>
+                <div class="tech-item">Patent Search</div>
+                <div class="tech-item">Markdown</div>
+                <div class="tech-item">GitHub Pages</div>
+            </div>
+        </div>
+    </section>
+
+    <section id="roadmap">
+        <div class="container">
+            <div class="section-header">
+                <h2>Roadmap</h2>
+                <p>
+                    The project starts as a focused MVP and can later evolve into a full research
+                    intelligence platform.
+                </p>
+            </div>
+
+            <div class="roadmap">
+                <div class="roadmap-item">
+                    <div class="check">✓</div>
+                    <div>
+                        <strong>MVP CLI workflow</strong><br />
+                        <span>Topic input, source search, ranking, review, and Markdown output.</span>
+                    </div>
+                </div>
+
+                <div class="roadmap-item">
+                    <div class="check">✓</div>
+                    <div>
+                        <strong>Markdown report generation</strong><br />
+                        <span>Executive summary, benchmark table, key findings, and references.</span>
+                    </div>
+                </div>
+
+                <div class="roadmap-item">
+                    <div>○</div>
+                    <div>
+                        <strong>RAG-based document analysis</strong><br />
+                        <span>Analyze uploaded papers, patents, and internal documents.</span>
+                    </div>
+                </div>
+
+                <div class="roadmap-item">
+                    <div>○</div>
+                    <div>
+                        <strong>PDF and web dashboard export</strong><br />
+                        <span>Generate polished reports and interactive dashboards.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <strong>Sajjad Rostami</strong><br />
+            PhD in Computer Science · Senior R&D Engineer · AI, XR, Healthcare Simulation, and Research Intelligence
+        </div>
+    </footer>
+</body>
+
+</html>
+```

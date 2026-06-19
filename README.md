@@ -119,42 +119,84 @@ OPENAI_BASE_URL=https://llm.aibricks.io/v1
 SERPAPI_API_KEY=your_key
 ```
 
-## Running Tests
+## Usage
 
-### Patent Adapter
+### FastAPI Server
+
+Start the API server:
+
+```bash
+uvicorn app:app --reload --host 0.0.0.0 --port 8000
+```
+
+Access the interactive API documentation at `http://localhost:8000/docs`
+
+**Generate a report via API:**
+
+```bash
+curl -X POST http://localhost:8000/generate \
+  -H "Content-Type: application/json" \
+  -d '{"topic": "XPBD soft body simulation algorithm"}'
+```
+
+**Test the API:**
+
+```bash
+python test_api.py
+```
+
+See [API_DEPLOYMENT.md](API_DEPLOYMENT.md) for deployment instructions (Railway, Heroku, Docker, AWS Lambda).
+
+### Running Tests
+
+**Patent Adapter:**
 
 ```bash
 python test_serpapi_patents_live.py
 ```
 
-### Unit Tests
+**Unit Tests:**
 
 ```bash
 pytest tests/ -v
+```
+
+**End-to-End MVP Test:**
+
+```bash
+python test_mvp_e2e.py
 ```
 
 ## Project Status
 
 ### Completed
 
-* Project structure
-* Pydantic data models
-* LLM client wrapper
-* Search adapter framework
-* SerpAPI patent adapter
-* Unit testing infrastructure
+* ✅ Project structure
+* ✅ Pydantic data models
+* ✅ LLM client wrapper
+* ✅ Search adapter framework
+* ✅ SerpAPI patent adapter
+* ✅ Semantic Scholar adapter
+* ✅ Search orchestration
+* ✅ Ranking engine
+* ✅ Benchmark metric generation
+* ✅ Report generation (Markdown)
+* ✅ Workspace management
+* ✅ **FastAPI REST API**
+* ✅ End-to-end pipeline
+* ✅ Unit testing infrastructure
 
 ### In Progress
 
-* Semantic Scholar adapter
-* Search orchestration
-* Ranking engine
+* User validation workflow
+* Interactive dashboard
 
 ### Planned
 
-* Benchmark metric generation
-* User validation workflow
-* Report generation
+* Commercial solution discovery
+* Tool discovery
+* Multi-source benchmarking
+* PDF export
 * Additional data sources
 
 ## Example Use Case

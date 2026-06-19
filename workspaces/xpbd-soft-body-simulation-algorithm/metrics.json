@@ -1,0 +1,52 @@
+[
+  {
+    "name": "Constraint Formulation Alignment Score",
+    "description": "Measures how closely the source implements constraint-based formulations core to XPBD, specifically evaluating support for position-based constraints, Lagrange multipliers, and constraint projection methods on a scale of 0-100. Higher scores indicate direct implementation of XPBD constraint solving mechanisms.",
+    "category": "accuracy"
+  },
+  {
+    "name": "Real-time Performance Capability Index",
+    "description": "Quantifies the source's demonstrated ability to achieve interactive frame rates (≥30 FPS) for soft body simulations, measured as percentage of test cases meeting real-time requirements. Evaluates whether the implementation can handle practical interactive applications.",
+    "category": "performance"
+  },
+  {
+    "name": "GPU Parallelization Support Level",
+    "description": "Assesses the degree of GPU acceleration implementation on a 5-point scale: 0=no GPU support, 1=partial CPU-GPU hybrid, 2=GPU-optimized kernels, 3=full GPU pipeline, 4=advanced parallel algorithms. Directly relevant to XPBD scalability on modern hardware.",
+    "category": "hardware"
+  },
+  {
+    "name": "Simulation Stability Metric",
+    "description": "Measures the robustness of constraint solving under extreme conditions (high velocities, large timesteps, complex collisions) using a normalized energy conservation score (0-100). Values above 85 indicate stable convergence without numerical artifacts or constraint violations.",
+    "category": "accuracy"
+  },
+  {
+    "name": "Scalability Factor for Particle Count",
+    "description": "Quantifies computational complexity scaling as particle count increases, measured as the ratio of frame time increase per 10,000 particles added. Lower ratios (closer to linear O(n)) indicate better scalability for large-scale simulations.",
+    "category": "scalability"
+  },
+  {
+    "name": "Constraint Solver Iteration Efficiency",
+    "description": "Measures the average number of constraint projection iterations required to achieve convergence (typically 1-10 iterations for XPBD) and the convergence rate per iteration. Lower iteration counts with faster convergence indicate more efficient solver implementation.",
+    "category": "efficiency"
+  },
+  {
+    "name": "Collision Detection Integration Score",
+    "description": "Evaluates the comprehensiveness of contact and collision handling mechanisms on a scale of 0-100, including support for self-collisions, continuous collision detection, and contact constraint formulation. Essential for realistic soft body interaction.",
+    "category": "accuracy"
+  },
+  {
+    "name": "Implementation Maturity Level",
+    "description": "Assesses the completeness of the XPBD implementation on a 5-point scale: 1=theoretical/proof-of-concept, 2=basic algorithm, 3=production-ready with optimization, 4=mature with multiple features, 5=industry-standard with extensive validation. Indicates practical usability.",
+    "category": "usability"
+  },
+  {
+    "name": "Memory Efficiency Ratio",
+    "description": "Measures memory consumption per simulated particle in kilobytes, accounting for constraint data, particle state, and solver structures. Lower ratios enable larger simulations on fixed hardware; benchmark target is <2KB per particle.",
+    "category": "efficiency"
+  },
+  {
+    "name": "XPBD Algorithm Specificity Index",
+    "description": "Quantifies how explicitly the source addresses Extended Position Based Dynamics principles (0-100 scale), including: position-based constraint formulation, extended constraint types, damping mechanisms, and temporal coherence. Measures direct relevance to XPBD methodology.",
+    "category": "accuracy"
+  }
+]

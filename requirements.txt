@@ -6,6 +6,8 @@ httpx==0.27.2
 pydantic==2.9.2
 rich==13.9.2
 hypothesis==6.115.2
+fastapi==0.115.0
+uvicorn==0.32.0
 
 # Development dependencies
 pytest==8.3.3

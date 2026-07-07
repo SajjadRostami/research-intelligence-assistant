@@ -13,6 +13,13 @@ from pathlib import Path
 
 from ria.models import BenchmarkMetric, RankedResults, ScoredSourceItem
 
+# Import comparison matrix rendering (optional, may not exist yet)
+try:
+    from ria.comparison_matrix import SourceMetricEvaluation, render_matrix_markdown
+except ImportError:
+    SourceMetricEvaluation = None
+    render_matrix_markdown = None
+
 
 class ReportRenderer:
     """
@@ -38,6 +45,9 @@ class ReportRenderer:
         ranked_results: RankedResults,
         metrics: list[BenchmarkMetric],
         workspace_dir: Path,
+        comparison_evaluations: list | None = None,
+        comparison_metric_names: list[str] | None = None,
+        cache_status: str | None = None,
     ) -> Path:
         """
         Generate a complete Markdown report and save to workspace.
@@ -47,6 +57,9 @@ class ReportRenderer:
             ranked_results: Ranked papers and patents
             metrics: List of benchmark metrics
             workspace_dir: Directory to save the report
+            comparison_evaluations: Optional list of SourceMetricEvaluation objects
+            comparison_metric_names: Optional list of metric names for comparison matrix
+            cache_status: Optional cache status message
 
         Returns:
             Path to the generated report.md file
@@ -56,7 +69,10 @@ class ReportRenderer:
         # Build report sections
         content = self._build_title(topic)
         content += self._build_metadata()
-        content += self._build_executive_summary(topic, ranked_results, metrics)
+        content += self._build_executive_summary(
+            topic, ranked_results, metrics, comparison_evaluations,
+            comparison_metric_names, cache_status
+        )
         content += self._build_top_patents(ranked_results.patents)
         content += self._build_top_papers(ranked_results.papers)
         content += self._build_benchmark_metrics(metrics)
@@ -80,6 +96,9 @@ class ReportRenderer:
         topic: str,
         ranked_results: RankedResults,
         metrics: list[BenchmarkMetric],
+        comparison_evaluations: list | None = None,
+        comparison_metric_names: list[str] | None = None,
+        cache_status: str | None = None,
     ) -> str:
         """Build the executive summary section."""
         paper_count = len(ranked_results.papers)
@@ -87,6 +106,11 @@ class ReportRenderer:
         metric_count = len(metrics)
 
         summary = "## Executive Summary\n\n"
+
+        # Add cache status if provided
+        if cache_status:
+            summary += f"**Research Source:** {cache_status}\n\n"
+
         summary += f"This report presents a comprehensive analysis of **{topic}** based on "
         summary += f"{patent_count} top-ranked patents"
 
@@ -95,6 +119,17 @@ class ReportRenderer:
 
         summary += f". The analysis evaluates sources across {metric_count} benchmark metrics "
         summary += "to identify leading implementations, methodologies, and performance characteristics.\n\n"
+
+        # Add comparison matrix if provided
+        if comparison_evaluations and comparison_metric_names and render_matrix_markdown:
+            summary += render_matrix_markdown(
+                evaluations=comparison_evaluations,
+                metric_names=comparison_metric_names,
+                include_evidence=False,
+                papers=ranked_results.papers,
+                patents=ranked_results.patents,
+            )
+            summary += "\n"
 
         # Add key findings
         if patent_count > 0:
@@ -121,6 +156,7 @@ class ReportRenderer:
         section += "prior art and implementations related to this research topic.\n\n"
 
         for i, patent in enumerate(patents, 1):
+            section += f'<a id="patent-{i}"></a>\n'
             section += f"### {i}. {patent.title}\n\n"
             section += f"**Patent Number:** {patent.patent_number or 'N/A'}  \n"
             section += f"**Assignee:** {patent.author_or_assignee or 'N/A'}  \n"
@@ -145,13 +181,32 @@ class ReportRenderer:
         section += "research and theoretical background for this topic.\n\n"
 
         for i, paper in enumerate(papers, 1):
+            section += f'<a id="paper-{i}"></a>\n'
             section += f"### {i}. {paper.title}\n\n"
             section += f"**Authors:** {paper.author_or_assignee or 'N/A'}  \n"
             section += f"**Publication Date:** {paper.publication_date or 'N/A'}  \n"
+
+            # Add venue if available
+            if paper.venue:
+                section += f"**Venue:** {paper.venue}  \n"
+
+            # Add citation count if available
+            if paper.citation_count is not None:
+                section += f"**Citations:** {paper.citation_count}  \n"
+
             section += f"**DOI:** {paper.doi or 'N/A'}  \n"
             section += f"**Relevance Score:** {paper.relevance_score:.2f}/1.00  \n"
             section += f"**Confidence:** {paper.confidence_level or 'N/A'}  \n"
             section += f"**URL:** [{paper.source_url}]({paper.source_url})\n\n"
+
+            # Add open access information
+            if paper.is_open_access or paper.pdf_url:
+                section += f"**Open Access:** ✅ Yes  \n"
+                if paper.pdf_url:
+                    section += f"**PDF:** [{paper.pdf_url}]({paper.pdf_url})  \n"
+            else:
+                section += f"**Open Access:** ❌ No  \n"
+            section += "\n"
 
             if paper.relevance_explanation:
                 section += f"**Relevance Analysis:**\n\n{paper.relevance_explanation}\n\n"

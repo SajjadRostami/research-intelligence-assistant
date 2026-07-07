@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Research Intelligence Assistant</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-align: center;
+        }
+
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+
+        .step {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border-left: 4px solid #3498db;
+        }
+
+        .step.hidden {
+            display: none;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        input[type="text"],
+        input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        input[type="number"] {
+            width: 150px;
+        }
+
+        input[type="checkbox"] {
+            margin-right: 8px;
+        }
+
+        button {
+            background: #3498db;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-right: 10px;
+        }
+
+        button:hover {
+            background: #2980b9;
+        }
+
+        button:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+
+        button.secondary {
+            background: #7f8c8d;
+        }
+
+        button.secondary:hover {
+            background: #6c7a7b;
+        }
+
+        .metrics-section {
+            margin-top: 20px;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .metric-item {
+            padding: 10px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .metric-item:hover {
+            background: #e8f4f8;
+            border-color: #3498db;
+        }
+
+        .metric-item.selected {
+            background: #d1ecf1;
+            border-color: #3498db;
+            border-width: 2px;
+        }
+
+        .metric-name {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .metric-description {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .custom-metric-input {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .custom-metric-input input {
+            flex: 1;
+        }
+
+        .custom-metrics-list {
+            margin-bottom: 15px;
+        }
+
+        .custom-metric-tag {
+            display: inline-block;
+            background: #e8f4f8;
+            padding: 5px 10px;
+            margin: 5px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .custom-metric-tag button {
+            background: none;
+            border: none;
+            color: #721c24;
+            padding: 0 5px;
+            margin-left: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .loading {
+            display: none;
+            padding: 20px;
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 4px;
+            margin: 20px 0;
+            text-align: center;
+            font-weight: 600;
+            color: #856404;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .error {
+            display: none;
+            padding: 20px;
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+            margin: 20px 0;
+            color: #721c24;
+        }
+
+        .error.show {
+            display: block;
+        }
+
+        .stats {
+            display: none;
+            padding: 20px;
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+
+        .stats.show {
+            display: block;
+        }
+
+        .stats h3 {
+            margin-bottom: 15px;
+            color: #0c5460;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .stat-item {
+            padding: 10px;
+            background: white;
+            border-radius: 4px;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #0c5460;
+        }
+
+        .report {
+            display: none;
+            margin-top: 30px;
+            padding: 30px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .report.show {
+            display: block;
+        }
+
+        .report h2 {
+            color: #2c3e50;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #3498db;
+        }
+
+        .report h3 {
+            color: #34495e;
+            margin-top: 25px;
+            margin-bottom: 12px;
+        }
+
+        .report p {
+            margin-bottom: 15px;
+        }
+
+        .report ul, .report ol {
+            margin-left: 30px;
+            margin-bottom: 15px;
+        }
+
+        .report li {
+            margin-bottom: 8px;
+        }
+
+        .report code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .report pre {
+            background: #f4f4f4;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin-bottom: 15px;
+        }
+
+        .report blockquote {
+            border-left: 4px solid #3498db;
+            padding-left: 20px;
+            margin: 20px 0;
+            color: #555;
+        }
+
+        .report table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        .report th, .report td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+
+        .report th {
+            background: #f8f9fa;
+            font-weight: 600;
+        }
+
+        .comparison-matrix {
+            border-collapse: collapse;
+            margin: 20px auto;
+            max-width: 90%;
+        }
+
+        .comparison-matrix th,
+        .comparison-matrix td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .comparison-matrix th {
+            background: #2d7d46 !important;
+            color: white !important;
+            font-weight: 600;
+        }
+
+        .comparison-matrix a {
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .comparison-matrix a:hover {
+            text-decoration: underline;
+        }
+
+        .status-badge {
+            display: inline-block;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Research Intelligence Assistant</h1>
+
+        <!-- Step 1: Topic Entry -->
+        <div id="step1" class="step">
+            <h2>Step 1: Enter Research Topic</h2>
+            <div class="form-group">
+                <label for="topic">Research Topic:</label>
+                <input type="text" id="topic" placeholder="Enter your research topic (e.g., XPBD soft body simulation)..." required>
+            </div>
+
+            <div class="form-group">
+                <label for="maxResults">Max Results Per Adapter:</label>
+                <input type="number" id="maxResults" value="3" min="1" max="50">
+            </div>
+
+            <div class="form-group">
+                <label style="font-weight: 600; color: #555; margin-bottom: 10px; display: block;">Research Mode:</label>
+                <div style="margin-left: 10px;">
+                    <label style="display: block; margin-bottom: 8px;">
+                        <input type="radio" name="researchMode" id="useCacheMode" value="cached" checked>
+                        Use cached results if available
+                    </label>
+                    <label style="display: block;">
+                        <input type="radio" name="researchMode" id="freshMode" value="fresh">
+                        Research from scratch
+                    </label>
+                </div>
+            </div>
+
+            <button id="suggestMetricsBtn" onclick="suggestMetrics()">Suggest Metrics</button>
+            <button class="secondary" onclick="resetForm()">Reset</button>
+        </div>
+
+        <!-- Step 2: Metric Selection -->
+        <div id="step2" class="step hidden">
+            <h2>Step 2: Select Comparison Metrics</h2>
+            <p>Select the metrics you want to use for comparing sources. You can also add custom metrics.</p>
+
+            <div class="metrics-section">
+                <h3>Suggested Metrics</h3>
+                <div id="metricsGrid" class="metrics-grid">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+
+            <div class="metrics-section">
+                <h3>Add Custom Metrics</h3>
+                <div class="custom-metric-input">
+                    <input type="text" id="customMetricInput" placeholder="Enter custom metric name...">
+                    <button onclick="addCustomMetric()">Add</button>
+                </div>
+                <div id="customMetricsList" class="custom-metrics-list">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+
+            <button id="generateBtn" onclick="generateReport()">Generate Report</button>
+            <button class="secondary" onclick="backToStep1()">Back</button>
+        </div>
+
+        <div id="loading" class="loading">
+            🔄 Processing... This may take a minute.
+        </div>
+
+        <div id="error" class="error"></div>
+
+        <div id="stats" class="stats">
+            <h3>📊 Report Statistics</h3>
+            <div class="stats-grid" id="statsContent"></div>
+        </div>
+
+        <div id="report" class="report"></div>
+    </div>
+
+    <script>
+        let suggestedMetrics = [];
+        let selectedMetricNames = [];
+        let customMetrics = [];
+
+        async function suggestMetrics() {
+            const topic = document.getElementById('topic').value.trim();
+
+            if (!topic) {
+                showError('Please enter a research topic.');
+                return;
+            }
+
+            hideError();
+            showLoading();
+            disableButton('suggestMetricsBtn');
+
+            try {
+                const response = await fetch('/suggest-metrics', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        topic: topic,
+                        max_metrics: 10
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || `Server error: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (!data.success || !data.suggested_metrics) {
+                    throw new Error('Failed to suggest metrics');
+                }
+
+                suggestedMetrics = data.suggested_metrics;
+                displayMetrics();
+
+                // Move to step 2
+                document.getElementById('step1').classList.add('hidden');
+                document.getElementById('step2').classList.remove('hidden');
+
+            } catch (error) {
+                showError(`Error: ${error.message}`);
+            } finally {
+                hideLoading();
+                enableButton('suggestMetricsBtn');
+            }
+        }
+
+        function displayMetrics() {
+            const grid = document.getElementById('metricsGrid');
+            grid.innerHTML = '';
+
+            suggestedMetrics.forEach((metric, index) => {
+                const item = document.createElement('div');
+                item.className = 'metric-item';
+                item.onclick = () => toggleMetric(metric.name, item);
+
+                item.innerHTML = `
+                    <div class="metric-name">${metric.name}</div>
+                    <div class="metric-description">${metric.description}</div>
+                `;
+
+                grid.appendChild(item);
+            });
+        }
+
+        function toggleMetric(metricName, element) {
+            if (selectedMetricNames.includes(metricName)) {
+                selectedMetricNames = selectedMetricNames.filter(m => m !== metricName);
+                element.classList.remove('selected');
+            } else {
+                selectedMetricNames.push(metricName);
+                element.classList.add('selected');
+            }
+        }
+
+        function addCustomMetric() {
+            const input = document.getElementById('customMetricInput');
+            const metricName = input.value.trim();
+
+            if (!metricName) {
+                return;
+            }
+
+            if (customMetrics.includes(metricName)) {
+                showError('This custom metric already exists.');
+                return;
+            }
+
+            customMetrics.push(metricName);
+            input.value = '';
+            displayCustomMetrics();
+        }
+
+        function displayCustomMetrics() {
+            const list = document.getElementById('customMetricsList');
+            list.innerHTML = '';
+
+            customMetrics.forEach(metric => {
+                const tag = document.createElement('span');
+                tag.className = 'custom-metric-tag';
+                tag.innerHTML = `${metric} <button onclick="removeCustomMetric('${metric}')">×</button>`;
+                list.appendChild(tag);
+            });
+        }
+
+        function removeCustomMetric(metricName) {
+            customMetrics = customMetrics.filter(m => m !== metricName);
+            displayCustomMetrics();
+        }
+
+        async function generateReport() {
+            const topic = document.getElementById('topic').value.trim();
+            const maxResults = parseInt(document.getElementById('maxResults').value);
+
+            // Get research mode from radio buttons
+            const researchMode = document.querySelector('input[name="researchMode"]:checked').value;
+            const useCache = researchMode === 'cached';
+            const forceFresh = researchMode === 'fresh';
+
+            if (!topic) {
+                showError('Please enter a research topic.');
+                return;
+            }
+
+            if (selectedMetricNames.length === 0 && customMetrics.length === 0) {
+                showError('Please select at least one metric or add a custom metric.');
+                return;
+            }
+
+            hideError();
+            hideStats();
+            hideReport();
+            showLoading();
+            disableButton('generateBtn');
+
+            try {
+                const response = await fetch('/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        topic: topic,
+                        max_results_per_adapter: maxResults,
+                        selected_metrics: selectedMetricNames,
+                        custom_metrics: customMetrics,
+                        use_cache: useCache,
+                        force_fresh_research: forceFresh
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || `Server error: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.message || 'Report generation failed');
+                }
+
+                if (data.stats) {
+                    displayStats(data.stats);
+                }
+
+                const reportContent = data.report_content || data.report || data.markdown || data.content;
+
+                if (reportContent) {
+                    displayReport(reportContent);
+                } else {
+                    throw new Error('No report content returned from API');
+                }
+
+            } catch (error) {
+                showError(`Error: ${error.message}`);
+            } finally {
+                hideLoading();
+                enableButton('generateBtn');
+            }
+        }
+
+        function displayStats(stats) {
+            const statsContent = document.getElementById('statsContent');
+            statsContent.innerHTML = '';
+
+            const statItems = [
+                { label: 'Total Raw Items', value: stats.total_raw_items || 0 },
+                { label: 'Patents Found', value: stats.patents_found || 0 },
+                { label: 'Papers Found', value: stats.papers_found || 0 },
+                { label: 'Open Access Papers', value: stats.open_access_papers_found || 0 },
+                { label: 'Ranked Patents', value: stats.ranked_patents || 0 },
+                { label: 'Ranked Papers', value: stats.ranked_papers || 0 },
+                { label: 'Metrics Used', value: stats.metrics_generated || 0 },
+                { label: 'Cache Status', value: stats.cache_status || 'N/A' }
+            ];
+
+            statItems.forEach(item => {
+                const statDiv = document.createElement('div');
+                statDiv.className = 'stat-item';
+                statDiv.innerHTML = `
+                    <div class="stat-label">${item.label}</div>
+                    <div class="stat-value">${item.value}</div>
+                `;
+                statsContent.appendChild(statDiv);
+            });
+
+            document.getElementById('stats').classList.add('show');
+        }
+
+        function displayReport(markdown) {
+            const reportDiv = document.getElementById('report');
+            reportDiv.innerHTML = marked.parse(markdown);
+            reportDiv.classList.add('show');
+        }
+
+        function backToStep1() {
+            document.getElementById('step2').classList.add('hidden');
+            document.getElementById('step1').classList.remove('hidden');
+        }
+
+        function resetForm() {
+            document.getElementById('topic').value = '';
+            document.getElementById('maxResults').value = '3';
+            document.getElementById('useCacheMode').checked = true;
+            selectedMetricNames = [];
+            customMetrics = [];
+            document.getElementById('step2').classList.add('hidden');
+            document.getElementById('step1').classList.remove('hidden');
+            hideError();
+            hideStats();
+            hideReport();
+        }
+
+        function showLoading() {
+            document.getElementById('loading').classList.add('show');
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').classList.remove('show');
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.classList.add('show');
+        }
+
+        function hideError() {
+            document.getElementById('error').classList.remove('show');
+        }
+
+        function hideStats() {
+            document.getElementById('stats').classList.remove('show');
+        }
+
+        function hideReport() {
+            document.getElementById('report').classList.remove('show');
+        }
+
+        function disableButton(btnId) {
+            document.getElementById(btnId).disabled = true;
+        }
+
+        function enableButton(btnId) {
+            document.getElementById(btnId).disabled = false;
+        }
+
+        // Allow Enter key to submit on step 1
+        document.getElementById('topic').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                suggestMetrics();
+            }
+        });
+
+        // Allow Enter key to add custom metric
+        document.getElementById('customMetricInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                addCustomMetric();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+
+# Local environment
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# ChromaDB local data
+chroma_db/
+test_chroma_db/
+chroma_metric_bank/
+chroma_research_cache/
+
+# Generated reports / local outputs
+workspaces/
+
+# Backups
+*.backup
+app.py.backup
+
+# Local environment
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# ChromaDB local generated data
+chroma_db/
+test_chroma_db/
+chroma_metric_bank/
+chroma_research_cache/
+
+# Generated reports / workspaces
+workspaces/
+
+# Local inspection/testing files
+inspect_chroma.py
+test_radio_buttons.html
+
+# Backups
+*.backup
+app.py.backup

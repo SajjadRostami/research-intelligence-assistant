@@ -65,6 +65,12 @@ class RawSourceItem(BaseModel):
     patent_number: str | None = None
     raw_adapter_source: str  # which adapter produced this item
 
+    # Paper-specific fields for open access and metadata
+    venue: str | None = None
+    citation_count: int | None = None
+    is_open_access: bool | None = None
+    pdf_url: str | None = None
+
 
 class ScoredSourceItem(RawSourceItem):
     """
@@ -184,3 +190,25 @@ class OrchestratorResult(BaseModel):
     topic: str
     queries: list[SearchQuery]
     raw_items: list[RawSourceItem]
+
+
+class MetricSuggestion(BaseModel):
+    """
+    A suggested metric for comparison matrix.
+
+    Returned by the metrics bank when suggesting metrics for a topic.
+    """
+    name: str
+    description: str
+    category: str
+    reason: str  # Why this metric is relevant
+
+
+class ComparisonRequest(BaseModel):
+    """
+    Request model for comparison matrix generation.
+
+    Includes selected and custom metrics for evaluating sources.
+    """
+    selected_metrics: list[str] = Field(default_factory=list)
+    custom_metrics: list[str] = Field(default_factory=list)

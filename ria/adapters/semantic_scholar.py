@@ -67,6 +67,41 @@ class SemanticScholarAdapter(SearchAdapter):
         self.max_retries = max_retries
         self.initial_retry_delay = initial_retry_delay
 
+    def _expand_query(self, query: str) -> list[str]:
+        """
+        Expand query with common variations and full forms.
+
+        For short acronyms, generates expanded technical phrases to improve recall.
+
+        Args:
+            query: Original search query
+
+        Returns:
+            List of query strings to search (including the original)
+        """
+        queries = [query]
+
+        # Query expansion for known acronyms
+        query_lower = query.lower().strip()
+
+        if query_lower == "xpbd" or "xpbd" in query_lower.split():
+            queries.extend([
+                "Extended Position Based Dynamics",
+                "XPBD position based dynamics",
+                "Position Based Dynamics compliant constraints",
+                "real-time simulation XPBD",
+            ])
+
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_queries = []
+        for q in queries:
+            if q.lower() not in seen:
+                seen.add(q.lower())
+                unique_queries.append(q)
+
+        return unique_queries
+
     def _build_search_params(self, query: str, max_results: int) -> dict[str, Any]:
         """
         Build query parameters for Semantic Scholar API.
@@ -84,21 +119,22 @@ class SemanticScholarAdapter(SearchAdapter):
         return {
             "query": query,
             "limit": limit,
-            "fields": "title,authors,abstract,year,publicationDate,externalIds,url",
+            "fields": "paperId,title,authors,abstract,year,venue,url,citationCount,externalIds,openAccessPdf,isOpenAccess,tldr",
         }
 
-    def _parse_paper_result(self, paper: dict[str, Any]) -> RawSourceItem | None:
+    def _parse_paper_result(self, paper: dict[str, Any]) -> dict[str, Any] | None:
         """
         Parse a single paper result from Semantic Scholar API.
 
-        Extracts metadata from the API response and creates a RawSourceItem.
+        Extracts metadata from the API response and creates a dictionary with
+        paper data including open access information.
         Returns None if the paper is missing required fields (title or URL).
 
         Args:
             paper: Dictionary containing paper data from API response
 
         Returns:
-            RawSourceItem if parsing succeeds, None if required fields missing
+            Dictionary with paper data if parsing succeeds, None if required fields missing
         """
         try:
             # Required fields
@@ -133,26 +169,45 @@ class SemanticScholarAdapter(SearchAdapter):
             external_ids = paper.get("externalIds") or {}
             doi = external_ids.get("DOI")
 
-            # Create relevance explanation from abstract snippet
+            # Extract open access information
+            is_open_access = paper.get("isOpenAccess", False)
+            open_access_pdf = paper.get("openAccessPdf")
+            pdf_url = None
+            if open_access_pdf and isinstance(open_access_pdf, dict):
+                pdf_url = open_access_pdf.get("url")
+
+            # Extract additional fields
+            venue = paper.get("venue")
+            citation_count = paper.get("citationCount", 0)
+            tldr_data = paper.get("tldr")
+            tldr_text = None
+            if tldr_data and isinstance(tldr_data, dict):
+                tldr_text = tldr_data.get("text")
+
+            # Create relevance explanation from abstract or TLDR
             relevance_explanation = None
             if abstract:
                 # Use first 200 characters of abstract as snippet
                 relevance_explanation = abstract[:200]
                 if len(abstract) > 200:
                     relevance_explanation += "..."
+            elif tldr_text:
+                relevance_explanation = tldr_text
 
-            # Create RawSourceItem
-            return RawSourceItem(
-                title=title,
-                source_type=SourceType.PAPER,
-                source_url=paper_url,
-                publication_date=publication_date,
-                author_or_assignee=authors if authors else None,
-                doi=doi,
-                relevance_explanation=relevance_explanation,
-                confidence_level=ConfidenceLevel.HIGH,
-                raw_adapter_source="semantic_scholar",
-            )
+            # Return parsed data with metadata
+            return {
+                "title": title,
+                "paper_id": paper_id,
+                "source_url": paper_url,
+                "publication_date": publication_date,
+                "authors": authors if authors else None,
+                "doi": doi,
+                "venue": venue,
+                "citation_count": citation_count,
+                "is_open_access": is_open_access,
+                "pdf_url": pdf_url,
+                "relevance_explanation": relevance_explanation,
+            }
 
         except Exception as e:
             logger.warning(f"Failed to parse paper result: {e}")
@@ -227,17 +282,64 @@ class SemanticScholarAdapter(SearchAdapter):
         # Should never reach here
         raise RuntimeError("Unexpected state in retry logic")
 
+    def _deduplicate_papers(self, papers: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """
+        Deduplicate papers by paperId, DOI, or normalized title.
+
+        Args:
+            papers: List of parsed paper dictionaries
+
+        Returns:
+            Deduplicated list of papers
+        """
+        seen_ids = set()
+        seen_dois = set()
+        seen_titles = set()
+        unique_papers = []
+
+        for paper in papers:
+            # Check paperId
+            paper_id = paper.get("paper_id")
+            if paper_id and paper_id in seen_ids:
+                continue
+
+            # Check DOI
+            doi = paper.get("doi")
+            if doi and doi in seen_dois:
+                continue
+
+            # Check normalized title (case-insensitive, whitespace-normalized)
+            title = paper.get("title", "")
+            normalized_title = " ".join(title.lower().split())
+            if normalized_title in seen_titles:
+                continue
+
+            # Add to seen sets
+            if paper_id:
+                seen_ids.add(paper_id)
+            if doi:
+                seen_dois.add(doi)
+            if normalized_title:
+                seen_titles.add(normalized_title)
+
+            unique_papers.append(paper)
+
+        return unique_papers
+
     async def search(self, query: str, max_results: int = 10) -> list[RawSourceItem]:
         """
-        Execute a search query against Semantic Scholar API.
+        Execute a search query against Semantic Scholar API with query expansion.
 
         This method:
-        1. Builds query parameters for the API
-        2. Makes an HTTP GET request to the paper search endpoint
-        3. Implements exponential backoff retry for rate limits (HTTP 429)
-        4. Parses the JSON response
-        5. Extracts paper metadata into RawSourceItem objects
-        6. Returns up to max_results papers
+        1. Expands query with common variations (e.g., "XPBD" -> "Extended Position Based Dynamics")
+        2. Builds query parameters for the API
+        3. Makes HTTP GET requests to the paper search endpoint for each query variant
+        4. Implements exponential backoff retry for rate limits (HTTP 429)
+        5. Parses the JSON response
+        6. Filters for open-access papers when available
+        7. Deduplicates by paperId, DOI, or title
+        8. Extracts paper metadata into RawSourceItem objects
+        9. Returns up to max_results papers
 
         Args:
             query: Search query string (natural language or keywords)
@@ -255,47 +357,115 @@ class SemanticScholarAdapter(SearchAdapter):
             This adapter implements exponential backoff retry for HTTP 429 errors.
             To get an API key, visit: https://www.semanticscholar.org/product/api
         """
+        # Expand query for better recall
+        queries = self._expand_query(query)
+        logger.info(f"Searching Semantic Scholar with {len(queries)} query variant(s): {queries}")
+
+        all_parsed_papers = []
+
         try:
-            # Build search URL and parameters
-            search_url = f"{self.base_url}/paper/search"
-            params = self._build_search_params(query, max_results)
-
-            logger.info(f"Searching Semantic Scholar: {query}")
-
-            # Make API request with retry logic
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await self._make_request_with_retry(client, search_url, params)
+                for query_variant in queries:
+                    try:
+                        # Build search URL and parameters
+                        search_url = f"{self.base_url}/paper/search"
+                        params = self._build_search_params(query_variant, max_results)
 
-                # Parse JSON response
-                data = response.json()
+                        logger.info(f"Semantic Scholar request URL: {search_url}")
+                        logger.info(f"Semantic Scholar query params: {params}")
 
-                # Extract papers from response
-                papers = data.get("data", [])
+                        # Make API request with retry logic
+                        response = await self._make_request_with_retry(client, search_url, params)
 
-                if not papers:
-                    logger.info(f"No papers found for query: {query}")
-                    return []
+                        logger.info(f"Semantic Scholar response status: {response.status_code}")
 
-                # Parse each paper result
-                results = []
-                for paper in papers:
-                    item = self._parse_paper_result(paper)
-                    if item:
-                        results.append(item)
+                        # Parse JSON response
+                        data = response.json()
 
-                logger.info(f"Extracted {len(results)} papers from Semantic Scholar")
-                return results
+                        # Extract papers from response
+                        papers = data.get("data", [])
+                        logger.info(f"Semantic Scholar raw results for '{query_variant}': {len(papers)} papers")
 
-        except httpx.HTTPStatusError as e:
-            logger.error(
-                f"Semantic Scholar API error (HTTP {e.response.status_code}): {e}"
+                        if not papers:
+                            continue
+
+                        # Parse each paper result
+                        for paper in papers:
+                            parsed = self._parse_paper_result(paper)
+                            if parsed:
+                                all_parsed_papers.append(parsed)
+
+                    except httpx.HTTPStatusError as e:
+                        logger.error(
+                            f"Semantic Scholar API error for query '{query_variant}' "
+                            f"(HTTP {e.response.status_code}): {e}"
+                        )
+                        if e.response.status_code == 429:
+                            logger.warning(
+                                "Rate limit exceeded. Consider using an API key or reducing request frequency."
+                            )
+                        continue
+
+                    except httpx.RequestError as e:
+                        logger.error(f"Semantic Scholar request failed for query '{query_variant}': {e}")
+                        continue
+
+            # Deduplicate papers
+            unique_papers = self._deduplicate_papers(all_parsed_papers)
+            logger.info(f"After deduplication: {len(unique_papers)} unique papers")
+
+            # Separate open access and non-open access papers
+            open_access_papers = [
+                p for p in unique_papers
+                if p.get("is_open_access") or p.get("pdf_url")
+            ]
+            other_papers = [
+                p for p in unique_papers
+                if not (p.get("is_open_access") or p.get("pdf_url"))
+            ]
+
+            logger.info(f"Open access papers found: {len(open_access_papers)}")
+            logger.info(f"Non-open access papers: {len(other_papers)}")
+
+            # Prefer open access papers, but include others if needed
+            selected_papers = open_access_papers[:max_results]
+            if len(selected_papers) < max_results:
+                remaining = max_results - len(selected_papers)
+                selected_papers.extend(other_papers[:remaining])
+
+            # Convert to RawSourceItem objects
+            results = []
+            for paper in selected_papers:
+                item = RawSourceItem(
+                    title=paper["title"],
+                    source_type=SourceType.PAPER,
+                    source_url=paper["source_url"],
+                    publication_date=paper["publication_date"],
+                    author_or_assignee=paper["authors"],
+                    doi=paper["doi"],
+                    venue=paper["venue"],
+                    citation_count=paper["citation_count"],
+                    is_open_access=paper["is_open_access"],
+                    pdf_url=paper["pdf_url"],
+                    relevance_explanation=paper["relevance_explanation"],
+                    confidence_level=ConfidenceLevel.HIGH,
+                    raw_adapter_source="semantic_scholar",
+                )
+                results.append(item)
+
+            logger.info(
+                f"Semantic Scholar final results: {len(results)} papers "
+                f"({len([r for r in results if r.is_open_access or r.pdf_url])} open access)"
             )
-            return []
 
-        except httpx.RequestError as e:
-            logger.error(f"Semantic Scholar request failed: {e}")
-            return []
+            if not results:
+                logger.warning(
+                    f"No papers found for query: {query}. This may indicate API issues or "
+                    "overly specific search terms."
+                )
+
+            return results
 
         except Exception as e:
-            logger.error(f"Semantic Scholar search failed for query '{query}': {e}")
+            logger.error(f"Semantic Scholar search failed for query '{query}': {e}", exc_info=True)
             return []

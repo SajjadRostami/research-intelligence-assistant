@@ -137,6 +137,10 @@ class TestLLMClientChat:
         mock_message.content = "Hello! How can I help you?"
         mock_choice.message = mock_message
         mock_response.choices = [mock_choice]
+        # Add usage attribute for analytics tracking
+        mock_response.usage = Mock(prompt_tokens=10, completion_tokens=20, total_tokens=30)
+        # Add usage attribute for analytics tracking
+        mock_response.usage = Mock(prompt_tokens=10, completion_tokens=20, total_tokens=30)
 
         client.client.chat.completions.create = Mock(return_value=mock_response)
 
@@ -161,6 +165,10 @@ class TestLLMClientChat:
         mock_message.content = "Response text"
         mock_choice.message = mock_message
         mock_response.choices = [mock_choice]
+        # Add usage attribute for analytics tracking
+        mock_response.usage = Mock(prompt_tokens=10, completion_tokens=20, total_tokens=30)
+        # Add usage attribute for analytics tracking
+        mock_response.usage = Mock(prompt_tokens=10, completion_tokens=20, total_tokens=30)
 
         client.client.chat.completions.create = Mock(return_value=mock_response)
 
@@ -182,6 +190,10 @@ class TestLLMClientChat:
         mock_message.content = "Response text"
         mock_choice.message = mock_message
         mock_response.choices = [mock_choice]
+
+        # Add usage attribute for analytics tracking
+
+        mock_response.usage = Mock(prompt_tokens=10, completion_tokens=20, total_tokens=30)
 
         client.client.chat.completions.create = Mock(return_value=mock_response)
 
@@ -205,6 +217,10 @@ class TestLLMClientChat:
         mock_message.content = None
         mock_choice.message = mock_message
         mock_response.choices = [mock_choice]
+
+        # Add usage attribute for analytics tracking
+
+        mock_response.usage = Mock(prompt_tokens=10, completion_tokens=20, total_tokens=30)
 
         client.client.chat.completions.create = Mock(return_value=mock_response)
 
@@ -238,6 +254,10 @@ class TestLLMClientChatJSON:
         mock_choice.message = mock_message
         mock_response.choices = [mock_choice]
 
+        # Add usage attribute for analytics tracking
+
+        mock_response.usage = Mock(prompt_tokens=10, completion_tokens=20, total_tokens=30)
+
         client.client.chat.completions.create = Mock(return_value=mock_response)
 
         messages = [{"role": "user", "content": "Generate data"}]
@@ -259,6 +279,10 @@ class TestLLMClientChatJSON:
         mock_message.content = markdown_wrapped
         mock_choice.message = mock_message
         mock_response.choices = [mock_choice]
+
+        # Add usage attribute for analytics tracking
+
+        mock_response.usage = Mock(prompt_tokens=10, completion_tokens=20, total_tokens=30)
 
         client.client.chat.completions.create = Mock(return_value=mock_response)
 
@@ -282,6 +306,10 @@ class TestLLMClientChatJSON:
         mock_choice.message = mock_message
         mock_response.choices = [mock_choice]
 
+        # Add usage attribute for analytics tracking
+
+        mock_response.usage = Mock(prompt_tokens=10, completion_tokens=20, total_tokens=30)
+
         client.client.chat.completions.create = Mock(return_value=mock_response)
 
         messages = [{"role": "user", "content": "Generate data"}]
@@ -300,6 +328,10 @@ class TestLLMClientChatJSON:
         mock_choice.message = mock_message
         mock_response.choices = [mock_choice]
 
+        # Add usage attribute for analytics tracking
+
+        mock_response.usage = Mock(prompt_tokens=10, completion_tokens=20, total_tokens=30)
+
         client.client.chat.completions.create = Mock(return_value=mock_response)
 
         messages = [{"role": "user", "content": "Generate data"}]
@@ -316,6 +348,10 @@ class TestLLMClientChatJSON:
         mock_message.content = json.dumps(json_response)
         mock_choice.message = mock_message
         mock_response.choices = [mock_choice]
+
+        # Add usage attribute for analytics tracking
+
+        mock_response.usage = Mock(prompt_tokens=10, completion_tokens=20, total_tokens=30)
 
         client.client.chat.completions.create = Mock(return_value=mock_response)
 
@@ -334,6 +370,10 @@ class TestLLMClientChatJSON:
         mock_choice.message = mock_message
         mock_response.choices = [mock_choice]
 
+        # Add usage attribute for analytics tracking
+
+        mock_response.usage = Mock(prompt_tokens=10, completion_tokens=20, total_tokens=30)
+
         client.client.chat.completions.create = Mock(return_value=mock_response)
 
         messages = [{"role": "user", "content": "Generate data"}]
@@ -349,6 +389,10 @@ class TestLLMClientChatJSON:
         mock_message.content = json.dumps(json_response)
         mock_choice.message = mock_message
         mock_response.choices = [mock_choice]
+
+        # Add usage attribute for analytics tracking
+
+        mock_response.usage = Mock(prompt_tokens=10, completion_tokens=20, total_tokens=30)
 
         client.client.chat.completions.create = Mock(return_value=mock_response)
 
@@ -380,6 +424,10 @@ class TestLLMClientChatJSON:
         mock_choice.message = mock_message
         mock_response.choices = [mock_choice]
 
+        # Add usage attribute for analytics tracking
+
+        mock_response.usage = Mock(prompt_tokens=10, completion_tokens=20, total_tokens=30)
+
         client.client.chat.completions.create = Mock(return_value=mock_response)
 
         messages = [{"role": "user", "content": "Generate data"}]
@@ -400,6 +448,10 @@ class TestLLMClientChatJSON:
         mock_message.content = content_with_whitespace
         mock_choice.message = mock_message
         mock_response.choices = [mock_choice]
+
+        # Add usage attribute for analytics tracking
+
+        mock_response.usage = Mock(prompt_tokens=10, completion_tokens=20, total_tokens=30)
 
         client.client.chat.completions.create = Mock(return_value=mock_response)
 

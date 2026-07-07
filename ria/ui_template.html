@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Research Intelligence Assistant</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -382,6 +383,123 @@
             font-size: 16px;
             font-weight: bold;
         }
+
+        /* Analytics sections */
+        .execution-summary, .analytics-charts, .workflow-viz, .export-buttons {
+            display: none;
+            margin-top: 30px;
+            padding: 30px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .execution-summary.show, .analytics-charts.show, .workflow-viz.show, .export-buttons.show {
+            display: block;
+        }
+
+        .execution-summary h3, .analytics-charts h3, .workflow-viz h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .summary-item {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border-left: 4px solid #3498db;
+        }
+
+        .summary-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .summary-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .summary-value.cost {
+            color: #27ae60;
+        }
+
+        .chart-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .chart-container {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+
+        .chart-container h4 {
+            color: #34495e;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .workflow-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .workflow-step {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border-left: 4px solid #27ae60;
+        }
+
+        .workflow-step-icon {
+            font-size: 1.5em;
+            margin-right: 15px;
+        }
+
+        .workflow-step-content {
+            flex: 1;
+        }
+
+        .workflow-step-name {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .workflow-step-meta {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .export-buttons {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .export-buttons button {
+            margin: 10px;
+            padding: 15px 30px;
+            font-size: 16px;
+        }
     </style>
 </head>
 <body>
@@ -458,12 +576,58 @@
         </div>
 
         <div id="report" class="report"></div>
+
+        <!-- LLM Execution Summary -->
+        <div id="executionSummary" class="execution-summary">
+            <h3>⚡ LLM Execution Summary</h3>
+            <div class="summary-grid" id="executionSummaryContent"></div>
+        </div>
+
+        <!-- Analytics Charts -->
+        <div id="analyticsCharts" class="analytics-charts">
+            <h3>📊 Execution Analytics</h3>
+
+            <div class="chart-row">
+                <div class="chart-container">
+                    <h4>Duration by Step</h4>
+                    <canvas id="durationChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h4>Cost by Step (Estimated)</h4>
+                    <canvas id="costChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-row">
+                <div class="chart-container">
+                    <h4>Token Distribution by Step</h4>
+                    <canvas id="tokenPieChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h4>Prompt vs Completion Tokens</h4>
+                    <canvas id="tokenStackedChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Workflow Visualization -->
+        <div id="workflowViz" class="workflow-viz">
+            <h3>🔄 Workflow Pipeline</h3>
+            <div id="workflowSteps" class="workflow-steps"></div>
+        </div>
+
+        <!-- Export Buttons -->
+        <div id="exportButtons" class="export-buttons">
+            <button onclick="exportResearchPDF()">📄 Export Research Report PDF</button>
+            <button onclick="exportUsagePDF()">📊 Export LLM Usage PDF</button>
+        </div>
     </div>
 
     <script>
         let suggestedMetrics = [];
         let selectedMetricNames = [];
         let customMetrics = [];
+        let currentReportData = null;  // Store current report data for PDF export
 
         async function suggestMetrics() {
             const topic = document.getElementById('topic').value.trim();
@@ -642,6 +806,26 @@
                     throw new Error('No report content returned from API');
                 }
 
+                // Store report data for PDF export
+                currentReportData = {
+                    topic: topic,
+                    report_content: reportContent,
+                    stats: data.stats,
+                    analytics: data.analytics,
+                    comparison_evaluations: data.comparison_evaluations || null,
+                    metric_names: data.metric_names || null,
+                    ranked_papers: data.ranked_papers || null,
+                    ranked_patents: data.ranked_patents || null
+                };
+
+                // Display analytics if available
+                if (data.analytics) {
+                    displayExecutionSummary(data.analytics);
+                    displayAnalyticsCharts(data.analytics);
+                    displayWorkflowVisualization(data.analytics);
+                    showExportButtons();
+                }
+
             } catch (error) {
                 showError(`Error: ${error.message}`);
             } finally {
@@ -684,6 +868,284 @@
             reportDiv.classList.add('show');
         }
 
+        function displayExecutionSummary(analytics) {
+            const summaryContent = document.getElementById('executionSummaryContent');
+            summaryContent.innerHTML = '';
+
+            const summaryItems = [
+                { label: 'Current Run Duration', value: `${analytics.total_duration_seconds?.toFixed(2) || 0}s` },
+                { label: 'LLM Calls', value: analytics.total_llm_calls || 0 },
+                { label: 'Total Tokens', value: analytics.total_tokens?.toLocaleString() || 0 },
+                { label: 'Prompt Tokens', value: analytics.total_prompt_tokens?.toLocaleString() || 0 },
+                { label: 'Completion Tokens', value: analytics.total_completion_tokens?.toLocaleString() || 0 },
+                { label: 'Estimated Cost', value: `$${analytics.estimated_total_cost?.toFixed(4) || 0}`, isCost: true },
+                { label: 'Cache Status', value: analytics.cache_status || 'N/A' },
+                { label: 'Papers Found', value: analytics.papers_found || 0 }
+            ];
+
+            summaryItems.forEach(item => {
+                const summaryDiv = document.createElement('div');
+                summaryDiv.className = 'summary-item';
+                summaryDiv.innerHTML = `
+                    <div class="summary-label">${item.label}</div>
+                    <div class="summary-value ${item.isCost ? 'cost' : ''}">${item.value}</div>
+                `;
+                summaryContent.appendChild(summaryDiv);
+            });
+
+            document.getElementById('executionSummary').classList.add('show');
+        }
+
+        function displayAnalyticsCharts(analytics) {
+            if (!analytics.steps || analytics.steps.length === 0) {
+                return;
+            }
+
+            const steps = analytics.steps.filter(s => s.duration_seconds > 0);
+
+            // Duration by Step Chart
+            const durationCtx = document.getElementById('durationChart').getContext('2d');
+            new Chart(durationCtx, {
+                type: 'bar',
+                data: {
+                    labels: steps.map(s => s.step_name),
+                    datasets: [{
+                        label: 'Duration (seconds)',
+                        data: steps.map(s => s.duration_seconds),
+                        backgroundColor: 'rgba(52, 152, 219, 0.6)',
+                        borderColor: 'rgba(52, 152, 219, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        title: { display: false }
+                    }
+                }
+            });
+
+            // Cost by Step Chart
+            const costCtx = document.getElementById('costChart').getContext('2d');
+            new Chart(costCtx, {
+                type: 'bar',
+                data: {
+                    labels: steps.map(s => s.step_name),
+                    datasets: [{
+                        label: 'Cost (USD)',
+                        data: steps.map(s => s.estimated_cost),
+                        backgroundColor: 'rgba(39, 174, 96, 0.6)',
+                        borderColor: 'rgba(39, 174, 96, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        title: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + value.toFixed(4);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Token Distribution Pie Chart
+            const tokenPieCtx = document.getElementById('tokenPieChart').getContext('2d');
+            const stepsWithTokens = steps.filter(s => s.total_tokens > 0);
+            new Chart(tokenPieCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: stepsWithTokens.map(s => s.step_name),
+                    datasets: [{
+                        data: stepsWithTokens.map(s => s.total_tokens),
+                        backgroundColor: [
+                            'rgba(52, 152, 219, 0.6)',
+                            'rgba(46, 204, 113, 0.6)',
+                            'rgba(155, 89, 182, 0.6)',
+                            'rgba(241, 196, 15, 0.6)',
+                            'rgba(231, 76, 60, 0.6)',
+                            'rgba(26, 188, 156, 0.6)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'right' }
+                    }
+                }
+            });
+
+            // Prompt vs Completion Tokens Stacked Chart
+            const tokenStackedCtx = document.getElementById('tokenStackedChart').getContext('2d');
+            new Chart(tokenStackedCtx, {
+                type: 'bar',
+                data: {
+                    labels: stepsWithTokens.map(s => s.step_name),
+                    datasets: [{
+                        label: 'Prompt Tokens',
+                        data: stepsWithTokens.map(s => s.prompt_tokens),
+                        backgroundColor: 'rgba(52, 152, 219, 0.6)',
+                        borderColor: 'rgba(52, 152, 219, 1)',
+                        borderWidth: 1
+                    }, {
+                        label: 'Completion Tokens',
+                        data: stepsWithTokens.map(s => s.completion_tokens),
+                        backgroundColor: 'rgba(46, 204, 113, 0.6)',
+                        borderColor: 'rgba(46, 204, 113, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: { stacked: true },
+                        y: { stacked: true }
+                    }
+                }
+            });
+
+            document.getElementById('analyticsCharts').classList.add('show');
+        }
+
+        function displayWorkflowVisualization(analytics) {
+            const workflowSteps = document.getElementById('workflowSteps');
+            workflowSteps.innerHTML = '';
+
+            if (!analytics.steps || analytics.steps.length === 0) {
+                return;
+            }
+
+            analytics.steps.forEach(step => {
+                const stepDiv = document.createElement('div');
+                stepDiv.className = 'workflow-step';
+
+                const meta = [];
+                if (step.duration_seconds !== null) {
+                    meta.push(`${step.duration_seconds.toFixed(2)}s`);
+                }
+                if (step.llm_calls > 0) {
+                    meta.push(`${step.llm_calls} LLM call${step.llm_calls > 1 ? 's' : ''}`);
+                }
+                if (step.total_tokens > 0) {
+                    meta.push(`${step.total_tokens.toLocaleString()} tokens`);
+                }
+                if (step.estimated_cost > 0) {
+                    meta.push(`$${step.estimated_cost.toFixed(4)}`);
+                }
+
+                stepDiv.innerHTML = `
+                    <div class="workflow-step-icon">✅</div>
+                    <div class="workflow-step-content">
+                        <div class="workflow-step-name">${step.step_name}</div>
+                        <div class="workflow-step-meta">${meta.join(' • ')}</div>
+                    </div>
+                `;
+
+                workflowSteps.appendChild(stepDiv);
+            });
+
+            document.getElementById('workflowViz').classList.add('show');
+        }
+
+        function showExportButtons() {
+            document.getElementById('exportButtons').classList.add('show');
+        }
+
+        async function exportResearchPDF() {
+            if (!currentReportData) {
+                showError('No report data available. Please generate a report first.');
+                return;
+            }
+
+            try {
+                showLoading();
+
+                const response = await fetch('/export-research-pdf', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(currentReportData)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || `Server error: ${response.status}`);
+                }
+
+                // Download the PDF
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `research_report_${currentReportData.topic.substring(0, 30)}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+                hideLoading();
+            } catch (error) {
+                hideLoading();
+                showError(`Error exporting research PDF: ${error.message}`);
+            }
+        }
+
+        async function exportUsagePDF() {
+            if (!currentReportData || !currentReportData.analytics) {
+                showError('No analytics data available. Please generate a report first.');
+                return;
+            }
+
+            try {
+                showLoading();
+
+                const response = await fetch('/export-usage-pdf', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        topic: currentReportData.topic,
+                        analytics: currentReportData.analytics
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || `Server error: ${response.status}`);
+                }
+
+                // Download the PDF
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `llm_usage_report_${currentReportData.topic.substring(0, 30)}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+                hideLoading();
+            } catch (error) {
+                hideLoading();
+                showError(`Error exporting usage PDF: ${error.message}`);
+            }
+        }
+
         function backToStep1() {
             document.getElementById('step2').classList.add('hidden');
             document.getElementById('step1').classList.remove('hidden');
@@ -695,11 +1157,20 @@
             document.getElementById('useCacheMode').checked = true;
             selectedMetricNames = [];
             customMetrics = [];
+            currentReportData = null;  // Clear report data
             document.getElementById('step2').classList.add('hidden');
             document.getElementById('step1').classList.remove('hidden');
             hideError();
             hideStats();
             hideReport();
+            hideAnalytics();
+        }
+
+        function hideAnalytics() {
+            document.getElementById('executionSummary').classList.remove('show');
+            document.getElementById('analyticsCharts').classList.remove('show');
+            document.getElementById('workflowViz').classList.remove('show');
+            document.getElementById('exportButtons').classList.remove('show');
         }
 
         function showLoading() {

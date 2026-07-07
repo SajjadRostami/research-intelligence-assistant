@@ -37,6 +37,10 @@ chroma_research_cache/
 # Generated reports / workspaces
 workspaces/
 
+# PDF exports and analytics outputs
+pdf_exports/
+*.pdf
+
 # Local inspection/testing files
 inspect_chroma.py
 test_radio_buttons.html
@@ -44,3 +48,8 @@ test_radio_buttons.html
 # Backups
 *.backup
 app.py.backup
+
+# Sample / local PDF files
+*.pdf
+pdf_exports/
+sample_pdf_exports/

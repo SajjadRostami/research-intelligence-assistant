@@ -57,6 +57,15 @@ Research Intelligence Assistant automates the research discovery and benchmarkin
 - Includes comparison matrix, ranked sources, and metadata
 - Displays cache status and open-access paper counts
 
+### LLM Observability and Analytics
+- **Token Usage Tracking**: Monitors prompt tokens, completion tokens, and total tokens for all LLM calls
+- **Cost Estimation**: Calculates estimated costs based on model pricing
+- **Execution Timing**: Tracks duration for each pipeline step
+- **LangSmith Tracing** (optional): Integration with LangSmith for detailed trace analysis
+- **Workflow Visualization**: Shows the complete pipeline execution flow in the UI
+- **Interactive Charts**: Duration by step, cost by step, token distribution, prompt vs completion tokens
+- **PDF Export** (coming soon): Export research reports and LLM usage analytics as PDFs
+
 ---
 
 ## Architecture
@@ -134,6 +143,15 @@ FastAPI Backend
    - `LLM_MODEL`: Model to use (default: `claude-haiku`)
    - `SEMANTIC_SCHOLAR_API_KEY`: For higher Semantic Scholar rate limits
 
+   **LangSmith Tracing** (optional, for LLM observability):
+   ```bash
+   LANGSMITH_API_KEY=lsv2_pt_your_key_here
+   LANGSMITH_PROJECT=your-project-name
+   LANGSMITH_TRACING_V2=true
+   ```
+
+   **Note**: The app works normally without LangSmith. If these variables are not set or tracing is disabled, local analytics tracking will still function.
+
 ---
 
 ## Running the Application
@@ -174,17 +192,41 @@ http://127.0.0.1:8000/ui
 
 ### Step 3: View Report
 
-- Statistics panel shows:
+- **Statistics panel** shows:
   - Total items found
   - Patents/papers breakdown
   - Open-access paper count
   - Cache status
-- Report includes:
+
+- **Research Report** includes:
   - Executive summary
   - Top-ranked papers (with open-access links)
   - Top-ranked patents
   - **Comparison Matrix** with heatmap coloring
   - Metric coverage summary
+
+- **LLM Execution Summary** displays:
+  - Total execution time
+  - Total LLM calls
+  - Token usage (prompt, completion, total)
+  - Estimated cost (labeled as estimate)
+  - Cache status
+  - Papers found
+
+- **Execution Analytics Charts**:
+  - Duration by Step (bar chart)
+  - Cost by Step (bar chart, estimated)
+  - Token Distribution by Step (doughnut chart)
+  - Prompt vs Completion Tokens (stacked bar chart)
+
+- **Workflow Pipeline** shows:
+  - Visual timeline of all executed steps
+  - Duration, tokens, cost per step
+  - Status indicators
+
+- **Export Buttons** (PDF export coming soon):
+  - Export Research Report PDF
+  - Export LLM Usage PDF
 
 ---
 
@@ -207,6 +249,101 @@ http://127.0.0.1:8000/ui
 - `chroma_db/research/`: Research cache storage
 
 **Note**: These directories contain local generated data. Add to `.gitignore`.
+
+---
+
+## LLM Observability and Analytics
+
+The Research Intelligence Assistant includes comprehensive LLM execution tracking and observability features.
+
+### Features
+
+#### 1. Token Usage Tracking
+- Tracks **prompt tokens**, **completion tokens**, and **total tokens** for every LLM call
+- Per-step breakdown showing token usage across the pipeline
+- Extracted directly from OpenAI-compatible API responses
+
+#### 2. Cost Estimation
+- Calculates estimated costs based on model pricing
+- Supports multiple models: Claude (Haiku, Sonnet, Opus), GPT-4, GPT-3.5, etc.
+- Per-step cost breakdown
+- **Note**: Costs are estimates based on approximate pricing and should not be used for billing
+
+#### 3. Execution Timing
+- Tracks duration for each pipeline step
+- Total execution time from start to finish
+- Helps identify performance bottlenecks
+
+#### 4. LangSmith Tracing (Optional)
+- Optional integration with [LangSmith](https://smith.langchain.com/) for detailed trace analysis
+- Trace IDs and URLs automatically captured when enabled
+- Graceful degradation: App works normally if LangSmith is not configured
+
+**To enable LangSmith tracing**, add to `.env`:
+```bash
+LANGSMITH_API_KEY=lsv2_pt_your_key_here
+LANGSMITH_PROJECT=your-project-name
+LANGSMITH_TRACING_V2=true
+```
+
+If these variables are missing or `LANGSMITH_TRACING_V2=false`, the app continues with local analytics only.
+
+#### 5. Analytics Data Storage
+- Analytics data saved to workspace as `analytics.json`
+- Includes: execution time, token counts, costs, cache status, step breakdown
+- Available for later analysis or export
+
+#### 6. UI Visualization
+After generating a report, the UI displays:
+
+**LLM Execution Summary:**
+- Total duration, LLM calls, tokens, estimated cost
+- Cache status and data counts
+
+**Interactive Charts:**
+- **Duration by Step**: Horizontal bar chart showing time spent per pipeline step
+- **Cost by Step**: Horizontal bar chart showing estimated cost per step
+- **Token Distribution**: Doughnut chart showing token usage across steps
+- **Prompt vs Completion Tokens**: Stacked bar chart comparing input vs output tokens
+
+**Workflow Pipeline:**
+- Visual timeline showing all executed steps
+- Status indicators, duration, token counts, and costs per step
+
+### Tracked Pipeline Steps
+
+1. **Initialize Components** - Setup LLM client, cache, workspace
+2. **Check Cache** - Look up cached results
+3. **Fetch Research** - SearchOrchestrator (if cache miss)
+4. **Deduplicate Sources** - Remove duplicate papers/patents
+5. **Score Sources** - LLM-based relevance scoring (multiple calls)
+6. **Select Top Sources** - Select top N papers and patents
+7. **Generate Metrics** - Auto-generate comparison metrics (if not selected)
+8. **Evaluate Comparison Matrix** - LLM evaluation of sources against metrics (multiple calls)
+9. **Generate Report** - Render final Markdown report
+
+### Cost Estimation Models
+
+The system uses approximate pricing per 1,000 tokens:
+
+| Model | Prompt Tokens | Completion Tokens |
+|-------|---------------|-------------------|
+| Claude Haiku | $0.00025 | $0.00125 |
+| Claude Sonnet | $0.003 | $0.015 |
+| Claude Opus | $0.015 | $0.075 |
+| GPT-4o-mini | $0.00015 | $0.0006 |
+| GPT-4o | $0.01 | $0.03 |
+| GPT-4 | $0.03 | $0.06 |
+| GPT-3.5 | $0.0005 | $0.0015 |
+
+**Important**: These are estimates. Actual costs may vary. Do not use for billing purposes.
+
+### Privacy and Security
+
+- **No API keys exposed**: API keys are never sent to the frontend or included in logs/PDFs
+- **No prompts logged**: User prompts and LLM responses are not stored in analytics (only metadata)
+- **Local tracking**: All analytics data stored locally in workspace directories
+- **Optional tracing**: LangSmith integration is completely optional
 
 ---
 

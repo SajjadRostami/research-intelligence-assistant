@@ -9,11 +9,24 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Optional
 
 from openai import OpenAI
 from openai.types.chat import ChatCompletion
 from pydantic import BaseModel
+
+# Optional LangSmith tracing - graceful degradation if not available
+try:
+    from langsmith import traceable
+    from langsmith.run_trees import get_current_run_tree
+    LANGSMITH_AVAILABLE = True
+except ImportError:
+    LANGSMITH_AVAILABLE = False
+    # No-op decorator when LangSmith is unavailable
+    def traceable(*args, **kwargs):
+        def decorator(func):
+            return func
+        return decorator if len(args) == 0 else decorator(args[0])
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -69,6 +82,48 @@ class LLMClient:
             max_retries=self.max_retries,
         )
 
+        # Check if LangSmith tracing is enabled
+        self.langsmith_enabled = (
+            LANGSMITH_AVAILABLE
+            and os.getenv("LANGSMITH_TRACING_V2", "false").lower() == "true"
+            and os.getenv("LANGSMITH_API_KEY", "").strip() != ""
+        )
+
+        # Store metadata from last LLM call (tokens, trace info)
+        self.last_call_metadata: Optional[dict[str, Any]] = None
+
+    def _extract_metadata(self, response: ChatCompletion) -> None:
+        """
+        Extract token usage and trace information from LLM response.
+
+        Stores metadata in self.last_call_metadata for optional analytics tracking.
+        Does not expose API keys or sensitive prompts.
+        """
+        metadata: dict[str, Any] = {
+            "model": self.model,
+            "usage": {
+                "prompt_tokens": response.usage.prompt_tokens if response.usage else 0,
+                "completion_tokens": response.usage.completion_tokens if response.usage else 0,
+                "total_tokens": response.usage.total_tokens if response.usage else 0,
+            }
+        }
+
+        # Extract LangSmith trace info if enabled (optional)
+        if self.langsmith_enabled:
+            try:
+                run_tree = get_current_run_tree()
+                if run_tree:
+                    metadata["trace_id"] = str(run_tree.id)
+                    # Construct public trace URL (no API keys)
+                    project = os.getenv("LANGSMITH_PROJECT", "default")
+                    metadata["trace_url"] = f"https://smith.langchain.com/o/{project}/projects/p/{project}/r/{run_tree.id}"
+            except Exception:
+                # Silently skip if trace extraction fails - tracing is optional
+                pass
+
+        self.last_call_metadata = metadata
+
+    @traceable(name="llm_chat", run_type="llm")
     def chat(
         self,
         messages: list[dict[str, str]],
@@ -104,6 +159,9 @@ class LLMClient:
             temperature=temperature,
             **kwargs,
         )
+
+        # Extract metadata for analytics tracking
+        self._extract_metadata(response)
 
         content = response.choices[0].message.content
         if content is None:
@@ -174,6 +232,9 @@ class LLMClient:
             temperature=temperature,
             **kwargs,
         )
+
+        # Extract metadata for analytics tracking
+        self._extract_metadata(response)
 
         content = response.choices[0].message.content
         if content is None:

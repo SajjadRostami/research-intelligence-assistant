@@ -4,6 +4,10 @@ FastAPI application for Research Intelligence Assistant.
 Provides REST API endpoints to run the research intelligence pipeline.
 """
 
+from dotenv import load_dotenv
+
+load_dotenv(override=True)
+
 import os
 from pathlib import Path
 from typing import Optional

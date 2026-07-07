@@ -312,6 +312,7 @@ async def generate_report(request: GenerateRequest):
 
         # Step 5: Generate comparison matrix
         comparison_evaluations = None
+        validation_result = None
         if all_metric_names:
             tracker.start_step("Evaluate Comparison Matrix")
             matrix_generator = ComparisonMatrixGenerator(llm_client=llm_client)
@@ -333,12 +334,62 @@ async def generate_report(request: GenerateRequest):
                     )
             tracker.finish_step()
 
-            # Save comparison evaluations
+            # Save initial comparison evaluations
             workspace_manager.save_artifact(
                 workspace_dir,
-                "comparison_evaluations.json",
+                "comparison_evaluations_initial.json",
                 [e.model_dump() for e in comparison_evaluations]
             )
+
+            # Step 5.5: Validate comparison matrix with Comparison Agent
+            try:
+                from ria.agents import ComparisonAgent
+
+                comparison_agent = ComparisonAgent(
+                    llm_client=llm_client,
+                    analytics_tracker=tracker,
+                )
+
+                validation_result = comparison_agent.validate_matrix(
+                    topic=request.topic,
+                    sources=all_sources,
+                    selected_metrics=all_metric_names,
+                    initial_matrix=comparison_evaluations,
+                    metric_descriptions=metric_descriptions,
+                )
+
+                # Use validated matrix for report
+                comparison_evaluations = validation_result.validated_matrix
+
+                # Save validated comparison evaluations
+                workspace_manager.save_artifact(
+                    workspace_dir,
+                    "comparison_evaluations.json",
+                    [e.model_dump() for e in comparison_evaluations]
+                )
+
+                # Save validation result
+                workspace_manager.save_artifact(
+                    workspace_dir,
+                    "comparison_validation.json",
+                    validation_result.model_dump()
+                )
+
+            except Exception as validation_error:
+                # Fallback: use original matrix if validation fails
+                import traceback
+                print(f"Warning: Comparison validation failed: {validation_error}")
+                traceback.print_exc()
+
+                # Save original comparison evaluations
+                workspace_manager.save_artifact(
+                    workspace_dir,
+                    "comparison_evaluations.json",
+                    [e.model_dump() for e in comparison_evaluations]
+                )
+
+                # Create minimal validation result
+                validation_result = None
 
         # Step 6: Generate report with comparison matrix
         tracker.start_step("Generate Report")
@@ -359,6 +410,7 @@ async def generate_report(request: GenerateRequest):
             comparison_evaluations=comparison_evaluations,
             comparison_metric_names=all_metric_names if comparison_evaluations else None,
             cache_status=cache_status_msg,
+            validation_summary=validation_result.validation_summary if validation_result else None,
         )
         tracker.finish_step()
 

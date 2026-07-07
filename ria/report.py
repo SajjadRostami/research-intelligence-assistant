@@ -48,6 +48,7 @@ class ReportRenderer:
         comparison_evaluations: list | None = None,
         comparison_metric_names: list[str] | None = None,
         cache_status: str | None = None,
+        validation_summary: str | None = None,
     ) -> Path:
         """
         Generate a complete Markdown report and save to workspace.
@@ -60,6 +61,7 @@ class ReportRenderer:
             comparison_evaluations: Optional list of SourceMetricEvaluation objects
             comparison_metric_names: Optional list of metric names for comparison matrix
             cache_status: Optional cache status message
+            validation_summary: Optional validation summary from Comparison Agent
 
         Returns:
             Path to the generated report.md file
@@ -71,7 +73,7 @@ class ReportRenderer:
         content += self._build_metadata()
         content += self._build_executive_summary(
             topic, ranked_results, metrics, comparison_evaluations,
-            comparison_metric_names, cache_status
+            comparison_metric_names, cache_status, validation_summary
         )
         content += self._build_top_patents(ranked_results.patents)
         content += self._build_top_papers(ranked_results.papers)
@@ -99,6 +101,7 @@ class ReportRenderer:
         comparison_evaluations: list | None = None,
         comparison_metric_names: list[str] | None = None,
         cache_status: str | None = None,
+        validation_summary: str | None = None,
     ) -> str:
         """Build the executive summary section."""
         paper_count = len(ranked_results.papers)
@@ -130,6 +133,12 @@ class ReportRenderer:
                 patents=ranked_results.patents,
             )
             summary += "\n"
+
+            # Add validation summary if provided
+            if validation_summary:
+                summary += "### Comparison Validation Summary\n\n"
+                summary += validation_summary
+                summary += "\n\n"
 
         # Add key findings
         if patent_count > 0:

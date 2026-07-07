@@ -1,6 +1,6 @@
 # Research Intelligence Assistant
 
-A FastAPI-based research assistant that searches for scientific papers and patents, suggests comparison metrics, and generates structured benchmark reports with interactive comparison matrices.
+A FastAPI-based research and benchmarking assistant that searches for scientific papers and patents, suggests comparison metrics, validates evaluations using an agent-based validation layer, and generates structured reports with professional PDF exports.
 
 ---
 
@@ -11,11 +11,14 @@ Research Intelligence Assistant automates the research discovery and benchmarkin
 1. **Searches** for relevant patents and scientific papers based on a research topic
 2. **Suggests** domain-relevant comparison metrics using a ChromaDB-backed metric bank
 3. **Evaluates** sources against selected metrics using LLM-powered analysis
-4. **Generates** a structured Markdown report with:
-   - Executive summary
+4. **Validates** the comparison matrix using the Comparison Agent with rule-based and LLM validation
+5. **Generates** a structured Markdown report with:
+   - Executive summary with validation insights
    - Top-ranked papers and patents
-   - Interactive comparison matrix with visual heatmap
+   - Validated comparison matrix with visual heatmap
    - Open-access paper detection and links
+6. **Exports** professional PDFs for research reports and LLM execution analytics
+7. **Tracks** LLM usage, token counts, estimated costs, and execution analytics
 
 ---
 
@@ -27,6 +30,7 @@ Research Intelligence Assistant automates the research discovery and benchmarkin
 - Custom metric support
 - Research mode selection (cached vs. fresh)
 - Real-time statistics and report rendering
+- PDF export buttons for research reports and analytics
 
 ### Data Sources
 - **Patents**: SerpAPI Patent Search (or mock adapter for testing)
@@ -45,30 +49,51 @@ Research Intelligence Assistant automates the research discovery and benchmarkin
 - "Research from scratch" mode to bypass cache
 - Cache status endpoint
 
+### Comparison Agent (Validation Layer)
+- **Agent-based matrix validation**: Reviews each cell in the comparison matrix before final report generation
+- **Rule-based validation**: Applies deterministic rules for well-defined metrics (Open Access, XPBD Support, Patent/IP, VR/HMD, Haptic Support, AI Support)
+- **LLM-based validation**: Used for ambiguous cases when rule-based validation is insufficient
+- **Evidence verification**: Ensures YES/PART/NO values are justified by source metadata (title, abstract, relevance analysis, source type)
+- **Change tracking**: Logs corrections with explanations of what changed and why
+- **Confidence scoring**: Provides validation confidence for each cell and overall matrix
+- **Fallback safety**: If validation fails, uses original matrix without blocking report generation
+- **No hallucination**: Agent is instructed to prefer PART or NO when evidence is weak or missing
+
 ### Executive Summary Comparison Matrix
 - Row-based heatmap coloring by overall source coverage
-- **✅ Fully Matched**, **⚠️ Partially Covered**, **❌ Not Covered** status badges
+- **✅ Fully Matched**, **⚠️ Partially Covered**, **❌ Not Covered** status badges (validated by Comparison Agent)
 - Linked source labels (Paper 1, Patent 1, etc.) jump to full citations
 - Metric coverage row shows column-wise average scores
 - Evidence tooltips on hover
+- Optional validation summary in executive summary
 
 ### Report Rendering
 - Markdown + embedded HTML for rich formatting
-- Includes comparison matrix, ranked sources, and metadata
+- Uses validated comparison matrix from Comparison Agent
+- Includes ranked sources, metadata, and validation insights
 - Displays cache status and open-access paper counts
+
+### PDF Export
+- **Research Report PDF**: Compact professional design with title, comparison matrix, top papers/patents, and references
+- **LLM Usage Analytics PDF**: Execution summary, token usage, estimated costs, step breakdown, and workflow visualization
+- **No secrets exposed**: API keys, prompts, and credentials are never included in PDFs
+- **Cost disclaimer**: All costs are clearly labeled as estimates, not official invoices
+- Clean, presentation-ready output for sharing research findings
 
 ### LLM Observability and Analytics
 - **Token Usage Tracking**: Monitors prompt tokens, completion tokens, and total tokens for all LLM calls
-- **Cost Estimation**: Calculates estimated costs based on model pricing
-- **Execution Timing**: Tracks duration for each pipeline step
+- **Cost Estimation**: Calculates estimated costs based on model pricing (labeled as estimates)
+- **Execution Timing**: Tracks duration for each pipeline step (including Comparison Agent validation)
 - **LangSmith Tracing** (optional): Integration with LangSmith for detailed trace analysis
 - **Workflow Visualization**: Shows the complete pipeline execution flow in the UI
 - **Interactive Charts**: Duration by step, cost by step, token distribution, prompt vs completion tokens
-- **PDF Export** (coming soon): Export research reports and LLM usage analytics as PDFs
+- **Validation Metrics**: Tracks cells reviewed, cells changed, and validation confidence from Comparison Agent
 
 ---
 
 ## Architecture
+
+### Multi-Agent Workflow
 
 ```
 User Input (Browser UI)
@@ -78,24 +103,63 @@ FastAPI Backend
     │
     ├── /suggest-metrics → MetricsBank (ChromaDB)
     ├── /cache/status    → ResearchCache (ChromaDB)
-    └── /generate        → Pipeline:
-            │
-            ├── ResearchCache (lookup or fetch)
-            ├── SearchOrchestrator (patents + papers)
-            ├── RankingEngine (LLM scoring + deduplication)
-            ├── MetricsBank (selected + custom metrics)
-            ├── ComparisonMatrixGenerator (LLM evaluation)
-            └── ReportRenderer (Markdown + HTML)
+    ├── /generate        → Pipeline:
+    │       │
+    │       ├── ResearchCache (lookup or fetch)
+    │       ├── SearchOrchestrator (patents + papers)
+    │       ├── RankingEngine (LLM scoring + deduplication)
+    │       ├── MetricsBank (selected + custom metrics)
+    │       ├── ComparisonMatrixGenerator (initial LLM evaluation)
+    │       ├── ComparisonAgent (validation layer) ← AGENT VALIDATION
+    │       └── ReportRenderer (Markdown + HTML with validated matrix)
+    │
+    ├── /export-research-pdf → PDFExporter (research report)
+    └── /export-usage-pdf    → PDFExporter (analytics report)
 ```
+
+**Comparison Agent Validation Flow:**
+
+```
+Initial Matrix (from ComparisonMatrixGenerator)
+    │
+    ▼
+For each cell (source × metric):
+    │
+    ├── Rule-Based Validation
+    │   ├── Open Access metric → Check is_open_access / pdf_url
+    │   ├── XPBD Support → Keyword matching (XPBD, PBD, position-based)
+    │   ├── Patent/IP → Source type validation
+    │   ├── VR/HMD → Keyword matching (VR, HMD, virtual reality)
+    │   ├── Haptic Support → Keyword matching (haptic device, force feedback)
+    │   └── AI Support → Keyword matching (AI, ML, deep learning)
+    │
+    ├── LLM-Based Validation (if rule-based insufficient)
+    │   └── Validate ambiguous cells with structured LLM call
+    │
+    └── Change Tracking
+        ├── Log corrections (old status → new status)
+        ├── Record reason for change
+        └── Track confidence score
+    │
+    ▼
+Validated Matrix
+    │
+    └── Used in Report + PDF Export
+```
+
+The **Comparison Agent** is a controlled validation agent, not a fully autonomous multi-agent system. It acts as a critic that reviews the initial matrix and corrects unsupported evaluations before report generation.
 
 ### Core Components
 
-- **FastAPI app** (`app.py`): REST API with `/ui`, `/generate`, `/suggest-metrics`, `/cache/status` endpoints
+- **FastAPI app** (`app.py`): REST API with `/ui`, `/generate`, `/suggest-metrics`, `/cache/status`, `/export-research-pdf`, `/export-usage-pdf` endpoints
 - **Adapters** (`ria/adapters/`): SerpAPI patents, Semantic Scholar papers
 - **ChromaDB Metric Bank** (`ria/metrics_bank.py`): Persistent metric storage
 - **ChromaDB Research Cache** (`ria/research_cache.py`): Caches fetched papers/patents
-- **Comparison Matrix Generator** (`ria/comparison_matrix.py`): LLM-based source evaluation
-- **Report Renderer** (`ria/report.py`): Markdown + HTML report generation
+- **Comparison Matrix Generator** (`ria/comparison_matrix.py`): LLM-based source evaluation (initial matrix)
+- **Comparison Agent** (`ria/agents/comparison_agent.py`): Validates matrix cells with rule-based and LLM validation
+- **Report Renderer** (`ria/report.py`): Markdown + HTML report generation (uses validated matrix)
+- **PDF Exporter** (`ria/pdf_export.py`): Professional PDF generation for reports and analytics
+- **Analytics Tracker** (`ria/analytics.py`): Tracks LLM usage, costs, and execution metrics
 - **UI Template** (`ria/ui_template.html`): Interactive browser interface
 
 ---
@@ -207,26 +271,27 @@ http://127.0.0.1:8000/ui
 
 - **LLM Execution Summary** displays:
   - Total execution time
-  - Total LLM calls
+  - Total LLM calls (including Comparison Agent validation calls)
   - Token usage (prompt, completion, total)
   - Estimated cost (labeled as estimate)
   - Cache status
   - Papers found
+  - Validation metrics (cells reviewed, cells changed, confidence score)
 
 - **Execution Analytics Charts**:
-  - Duration by Step (bar chart)
-  - Cost by Step (bar chart, estimated)
+  - Duration by Step (bar chart, includes Comparison Agent step)
+  - Cost by Step (bar chart, estimated, includes validation costs)
   - Token Distribution by Step (doughnut chart)
   - Prompt vs Completion Tokens (stacked bar chart)
 
 - **Workflow Pipeline** shows:
-  - Visual timeline of all executed steps
+  - Visual timeline of all executed steps (including validation)
   - Duration, tokens, cost per step
   - Status indicators
 
-- **Export Buttons** (PDF export coming soon):
-  - Export Research Report PDF
-  - Export LLM Usage PDF
+- **Export Buttons**:
+  - Export Research Report PDF (with validated matrix)
+  - Export LLM Usage Analytics PDF
 
 ---
 
@@ -249,6 +314,116 @@ http://127.0.0.1:8000/ui
 - `chroma_db/research/`: Research cache storage
 
 **Note**: These directories contain local generated data. Add to `.gitignore`.
+
+---
+
+## Comparison Agent
+
+### Overview
+
+The **Comparison Agent** is a validation layer that reviews the comparison matrix before the final report is generated. It acts as a critic that verifies whether each YES/PART/NO evaluation is justified by the available evidence.
+
+### Responsibility
+
+The Comparison Agent:
+- Reviews the initial source comparison matrix generated by `ComparisonMatrixGenerator`
+- Checks each source against each selected metric
+- Validates whether each YES / PART / NO value is supported by evidence
+- Corrects unsupported or incorrect values
+- Logs what changed and why
+- Provides a confidence score for the validation
+
+### Evaluation Definitions
+
+- **YES (✅ / full)**: Clear and explicit evidence supports the metric in the source metadata
+- **PART (⚠️ / partial)**: Partial, indirect, or related evidence supports the metric
+- **NO (❌ / none)**: No clear evidence supports the metric
+
+### Evidence Sources
+
+The Comparison Agent bases its validation on:
+- Source title
+- Source abstract or summary
+- Relevance analysis explanation
+- Source type (paper vs. patent)
+- Metadata (DOI, patent number, venue, authors, publication date)
+- Flags (is_open_access, pdf_url)
+- Selected metric definitions
+
+The agent **does not hallucinate** and is instructed to prefer **PART** or **NO** when evidence is weak or missing.
+
+### Rule-Based Validation
+
+The Comparison Agent includes deterministic rule-based validation for well-defined metrics:
+
+#### Open Access
+- **YES**: if `is_open_access` flag is true OR `pdf_url` exists
+- **NO**: if neither flag is set
+
+#### XPBD Support
+- **YES**: if title or relevance analysis explicitly mentions "XPBD" or "Extended Position Based Dynamics"
+- **PART**: if mentions "position-based dynamics", "PBD", or "constraint-based simulation"
+- **NO**: otherwise
+
+#### Patent / IP Coverage
+- **YES**: if source type is patent
+- **PART**: if paper discusses patents or IP
+- **NO**: otherwise
+
+#### VR HMD Integration
+- **YES**: if mentions "VR", "HMD", "head-mounted display", "virtual reality", "Oculus", or "HTC Vive"
+- **PART**: if mentions "simulation", "training", or "immersive" (context-dependent)
+- **NO**: otherwise
+
+#### Haptic Robot Support
+- **YES**: if mentions "haptic device", "haptic robot", "force feedback device", "haptic interface", or "robotic haptics"
+- **PART**: if mentions "haptic feedback", "haptic", "force feedback", or "tactile"
+- **NO**: otherwise
+
+#### AI Support
+- **YES**: if mentions "AI", "machine learning", "deep learning", "neural network", "learning-based", or "ML"
+- **PART**: if mentions "optimization", "automated", "intelligent", or "adaptive" (context-dependent)
+- **NO**: otherwise
+
+### LLM-Based Validation
+
+When rule-based validation is insufficient or unavailable for a metric, the Comparison Agent can use LLM-based validation:
+
+- **Input**: Source context, metric name, current status, current evidence, metric description
+- **Output**: Structured JSON with validated status, confidence, evidence, and reason for change
+- **Safety**: Falls back to original evaluation if LLM call fails
+- **Temperature**: 0.2 (low temperature for consistency)
+- **Instructions**: "Do not hallucinate. Base your decision ONLY on the provided evidence."
+
+LLM-based validation does not replace rule-based validation—it complements it for ambiguous cases.
+
+### Validation Output
+
+Validation results include:
+
+- **validated_matrix**: List of `SourceMetricEvaluation` objects with corrected status values
+- **changes**: List of `ValidationChange` objects with old status, new status, and reason
+- **validation_summary**: Human-readable summary of validation results
+- **confidence_score**: Overall confidence score (0.0 to 1.0)
+- **cells_reviewed**: Total number of matrix cells reviewed
+- **cells_changed**: Total number of matrix cells corrected
+
+### Workspace Artifacts
+
+Validation generates the following workspace files:
+
+- `comparison_evaluations_initial.json`: Initial matrix before validation
+- `comparison_evaluations.json`: Validated matrix after Comparison Agent
+- `comparison_validation.json`: Validation result with changes and summary
+
+**Note**: These are local generated files and should not be committed to git.
+
+### Fallback Behavior
+
+If Comparison Agent validation fails for any reason:
+- The original matrix from `ComparisonMatrixGenerator` is used
+- Report generation continues without blocking
+- A warning is logged but the pipeline completes successfully
 
 ---
 
@@ -320,7 +495,8 @@ After generating a report, the UI displays:
 6. **Select Top Sources** - Select top N papers and patents
 7. **Generate Metrics** - Auto-generate comparison metrics (if not selected)
 8. **Evaluate Comparison Matrix** - LLM evaluation of sources against metrics (multiple calls)
-9. **Generate Report** - Render final Markdown report
+9. **Validate Comparison Matrix** - Comparison Agent validates each cell (rule-based + optional LLM)
+10. **Generate Report** - Render final Markdown report with validated matrix
 
 ### Cost Estimation Models
 
@@ -475,6 +651,62 @@ Get cache status for a topic.
 }
 ```
 
+### `POST /export-research-pdf`
+
+Export research report as a professional PDF.
+
+**Request Body**:
+```json
+{
+  "topic": "XPBD soft body simulation",
+  "report_content": "... Markdown content ...",
+  "stats": { ... },
+  "analytics": { ... },
+  "comparison_evaluations": [ ... ],
+  "metric_names": ["XPBD Support", "GPU Support"],
+  "ranked_papers": [ ... ],
+  "ranked_patents": [ ... ]
+}
+```
+
+**Response**: PDF file download
+
+**Features**:
+- Compact professional header with topic and date
+- Validated comparison matrix with color-coded cells
+- Top papers section with citations
+- Top patents section with assignees
+- Full references
+- Does not expose API keys or secrets
+
+### `POST /export-usage-pdf`
+
+Export LLM usage analytics as a professional PDF.
+
+**Request Body**:
+```json
+{
+  "topic": "XPBD soft body simulation",
+  "analytics": {
+    "total_duration_seconds": 12.5,
+    "total_llm_calls": 15,
+    "total_tokens": 12000,
+    "estimated_total_cost": 0.0456,
+    "steps": [ ... ]
+  }
+}
+```
+
+**Response**: PDF file download
+
+**Features**:
+- Execution summary with timing and token counts
+- Estimated costs (clearly labeled as estimates)
+- Per-step breakdown
+- Workflow pipeline visualization
+- LangSmith trace information (if available)
+- Does not expose API keys or prompts
+
 ---
 
 ## Testing
@@ -485,23 +717,42 @@ Get cache status for a topic.
 python -m pytest
 ```
 
+**Expected Result**: 120 tests passing (as of 2026-07-07)
+
 ### Run Specific Tests
 
 ```bash
 # Unit tests
-python -m pytest tests/unit/
+python -m pytest tests/unit/ -v
 
-# Test new features
-python test_new_features.py
+# Comparison Agent tests
+python -m pytest test_comparison_agent.py -v
+python -m pytest test_comparison_agent_integration.py -v
+
+# PDF export tests
+python -m pytest tests/unit/test_pdf_export.py tests/unit/test_research_pdf_fixes.py -v
+
+# Semantic Scholar adapter
+python -m pytest tests/unit/test_semantic_scholar.py -v
+```
+
+### Comparison Agent Tests
+
+```bash
+# Rule-based validation tests
+python -m pytest test_comparison_agent.py::TestComparisonAgentRuleBased -v
+
+# LLM-based validation tests (requires OPENAI_API_KEY)
+python -m pytest test_comparison_agent.py::TestComparisonAgentLLMBased -v
+
+# Integration tests (full pipeline with validation)
+python -m pytest test_comparison_agent_integration.py -v
 ```
 
 ### Manual Testing
 
 ```bash
-# Test Semantic Scholar adapter
-python -m pytest tests/unit/test_semantic_scholar.py -v
-
-# Test full pipeline
+# Test full pipeline with Comparison Agent
 python test_mvp_e2e.py
 ```
 
@@ -526,18 +777,32 @@ __pycache__/
 chroma_db/
 test_chroma_db/
 
-# Workspaces
+# Workspaces and generated artifacts
 workspaces/
+
+# PDF exports
+pdf_exports/
+sample_pdf_exports/
 
 # Backups
 *.backup
 ```
 
+**Important**: Workspace directories (`workspaces/`) contain local generated files such as:
+- `comparison_evaluations_initial.json`
+- `comparison_evaluations.json`
+- `comparison_validation.json`
+- `analytics.json`
+- `report.md`
+
+These are local artifacts and should never be committed.
+
 ### Protect Your API Keys
 
-- Never commit `.env` files
+- Never commit `.env` files with real API keys
 - Use `.env.example` as a template
 - Store real keys in environment variables or secret managers
+- API keys are never exposed in PDFs, logs, or frontend responses
 
 ---
 
@@ -581,6 +846,9 @@ research-intelligence-assistant/
 │   │   ├── semantic_scholar.py
 │   │   ├── serpapi_patents.py
 │   │   └── mock_patent.py
+│   ├── agents/                 # Agent-based components
+│   │   ├── __init__.py
+│   │   └── comparison_agent.py # Comparison matrix validator
 │   ├── metrics_bank.py         # ChromaDB metric bank
 │   ├── research_cache.py       # ChromaDB research cache
 │   ├── comparison_matrix.py    # Matrix generation
@@ -590,14 +858,22 @@ research-intelligence-assistant/
 │   ├── orchestrator.py         # Search orchestration
 │   ├── ranking.py              # Ranking engine
 │   ├── report.py               # Report renderer
+│   ├── pdf_export.py           # PDF generation
+│   ├── analytics.py            # Execution analytics tracker
 │   ├── workspace.py            # Workspace management
 │   └── ui_template.html        # Browser UI template
 ├── tests/                      # Test suite
 │   └── unit/
+│       ├── test_pdf_export.py
+│       ├── test_research_pdf_fixes.py
+│       └── ...
+├── test_comparison_agent.py    # Comparison Agent tests
+├── test_comparison_agent_integration.py  # Integration tests
 ├── chroma_db/                  # ChromaDB data (not committed)
 │   ├── metrics/
 │   └── research/
-└── workspaces/                 # Generated reports (not committed)
+├── workspaces/                 # Generated reports (not committed)
+└── pdf_exports/                # Generated PDFs (not committed)
 ```
 
 ---
@@ -616,15 +892,23 @@ XPBD soft body simulation algorithm
 - Open Access
 
 **Output**:
-1. **Executive Summary**: High-level overview of research landscape
-2. **Top Papers**: 5 ranked papers with citation counts, venues, and open-access links
-3. **Top Patents**: 5 ranked patents with assignees and publication dates
-4. **Comparison Matrix**:
+1. **Executive Summary**: High-level overview of research landscape with validation insights
+2. **Validated Comparison Matrix**:
+   - Reviewed and corrected by Comparison Agent
    - Row-based heatmap coloring (green = high coverage, red = low coverage)
-   - Status badges for each metric per source
+   - Status badges (✅/⚠️/❌) for each metric per source
    - Linked source labels jump to full citations
    - Metric coverage row shows average scores
-5. **Cache Status**: Reports whether results were cached or freshly fetched
+   - Evidence tooltips on hover
+3. **Top Papers**: 5 ranked papers with citation counts, venues, and open-access links
+4. **Top Patents**: 5 ranked patents with assignees and publication dates
+5. **References**: Full citation details for all sources
+6. **Cache Status**: Reports whether results were cached or freshly fetched
+7. **Validation Summary**: Shows how many cells were reviewed and corrected by the Comparison Agent
+
+**PDF Exports**:
+- **Research Report PDF**: Compact professional design with title, validated matrix, top sources, and references
+- **LLM Usage Analytics PDF**: Execution summary, token usage, estimated costs, and workflow visualization
 
 ---
 
@@ -638,17 +922,44 @@ XPBD soft body simulation algorithm
 - Open-access paper detection and PDF links
 - Custom metric support
 - Cache status endpoint
+- **Comparison Agent with rule-based and LLM validation**
+- **Professional PDF exports for research reports and analytics**
+- **LLM usage tracking and cost estimation**
+- **Validation change logging and confidence scoring**
 
 ### In Progress 🚧
 - Enhanced metric categorization
 - User feedback loop for metric refinement
+- Additional rule-based validation patterns
 
 ### Planned 🔮
-- PDF report export
 - Additional data sources (ArXiv, Google Patents)
 - Commercial solution discovery
 - Interactive dashboard with filters
 - Multi-source benchmarking
+- Fully autonomous multi-agent research system
+
+---
+
+## Project Status
+
+This is a **demo-ready prototype** with production-oriented features, developed as part of an AI Engineering Bootcamp project. It demonstrates:
+- Multi-stage LLM pipeline orchestration
+- Agent-based validation layer
+- ChromaDB-backed caching and similarity search
+- Professional PDF generation
+- LLM observability and cost tracking
+
+The project is suitable for:
+- Research demonstrations
+- Educational purposes
+- Proof-of-concept for research automation
+- Foundation for production-ready systems
+
+**Not recommended for**:
+- Production use without further hardening
+- Mission-critical research workflows
+- Official cost accounting (estimates only)
 
 ---
 
@@ -657,7 +968,7 @@ XPBD soft body simulation algorithm
 **Sajjad Rostami**  
 PhD in Computer Science / XR / AI Systems
 
-Research Intelligence Assistant was developed as part of an AI Engineering Bootcamp project focused on LLMs, RAG systems, and intelligent research automation.
+Research Intelligence Assistant was developed as part of an AI Engineering Bootcamp project focused on LLMs, RAG systems, agent-based architectures, and intelligent research automation.
 
 ---
 

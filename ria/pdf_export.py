@@ -600,17 +600,29 @@ class PDFExporter:
         )
         story.append(Paragraph("Executive Usage Summary", header_style))
 
+        # Determine analytics source
+        analytics_source = analytics.get('analytics_source') or analytics.get('source', 'Local tracker')
+
+        # Format values with "Not available" fallback
+        def format_value(value, formatter=None):
+            if value is None or (isinstance(value, str) and value == ''):
+                return 'Not available'
+            if formatter:
+                return formatter(value)
+            return str(value)
+
         # Key metrics in 2-column compact table
         summary_data = [
             ["Metric", "Value"],
-            ["Current Run Duration", f"{analytics.get('total_duration_seconds', 0):.2f}s"],
-            ["LLM Calls", str(analytics.get('total_llm_calls', 0))],
-            ["Prompt Tokens", f"{analytics.get('total_prompt_tokens', 0):,}"],
-            ["Completion Tokens", f"{analytics.get('total_completion_tokens', 0):,}"],
-            ["Total Tokens", f"{analytics.get('total_tokens', 0):,}"],
-            ["Estimated Cost", f"${analytics.get('estimated_total_cost', 0):.4f}"],
-            ["Papers Found", str(analytics.get('papers_found', 0))],
-            ["Patents Found", str(analytics.get('patents_found', 0))],
+            ["Analytics Source", analytics_source],
+            ["Current Run Duration", format_value(analytics.get('total_duration_seconds'), lambda v: f"{v:.2f}s")],
+            ["LLM Calls", format_value(analytics.get('total_llm_calls', 0))],
+            ["Prompt Tokens", format_value(analytics.get('total_prompt_tokens'), lambda v: f"{v:,}")],
+            ["Completion Tokens", format_value(analytics.get('total_completion_tokens'), lambda v: f"{v:,}")],
+            ["Total Tokens", format_value(analytics.get('total_tokens'), lambda v: f"{v:,}")],
+            ["Estimated Cost", format_value(analytics.get('estimated_total_cost'), lambda v: f"${v:.4f}")],
+            ["Papers Found", format_value(analytics.get('papers_found', 0))],
+            ["Patents Found", format_value(analytics.get('patents_found', 0))],
         ]
 
         summary_table = Table(summary_data, colWidths=[2.5*inch, 2*inch])
@@ -1180,6 +1192,31 @@ class PDFExporter:
             story.append(obs_table)
             story.append(Spacer(1, 0.2 * inch))
 
+        # Analytics source information
+        analytics_source = analytics.get('analytics_source') or analytics.get('source', 'Local tracker')
+        is_langsmith = 'LangSmith' in analytics_source
+
+        source_style = ParagraphStyle(
+            name='SourceText',
+            parent=self.styles['Normal'],
+            fontSize=8,
+            textColor=colors.HexColor('#333333'),
+            spaceAfter=6,
+        )
+
+        if is_langsmith:
+            story.append(Paragraph(
+                f"<b>Analytics Source:</b> {analytics_source} — "
+                "Usage data retrieved from LangSmith traces based on actual LLM API calls.",
+                source_style
+            ))
+        else:
+            story.append(Paragraph(
+                f"<b>Analytics Source:</b> {analytics_source} — "
+                "LangSmith tracing was not enabled or unavailable for this run.",
+                source_style
+            ))
+
         # Disclaimer
         disclaimer_style = ParagraphStyle(
             name='DisclaimerText',
@@ -1190,7 +1227,7 @@ class PDFExporter:
         )
         story.append(Paragraph(
             "<b>Usage Estimate Disclaimer:</b> The cost estimates in this report are based on "
-            "approximate model pricing and token counts. <b>This is a usage estimate, not an official invoice.</b> "
+            "approximate model pricing and token counts. <b>This is AI execution analytics, not an official invoice.</b> "
             "Actual costs may vary based on your provider's pricing, contract terms, and usage patterns. "
             "This report is provided for informational and analytical purposes only.",
             disclaimer_style

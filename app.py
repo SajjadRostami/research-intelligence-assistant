@@ -145,13 +145,17 @@ async def generate_report(request: GenerateRequest):
         GenerateResponse with report path, content, and statistics
     """
     try:
+        # Generate unique report ID for LangSmith tracing
+        import uuid
+        report_id = str(uuid.uuid4())
+
         # Initialize analytics tracker
         from ria.analytics import AnalyticsTracker
         tracker = AnalyticsTracker(topic=request.topic)
 
         # Initialize components
         tracker.start_step("Initialize Components")
-        llm_client = LLMClient()
+        llm_client = LLMClient(report_id=report_id, topic=request.topic)
 
         # Initialize cache and metrics bank
         from ria.research_cache import ResearchCache
@@ -443,8 +447,25 @@ async def generate_report(request: GenerateRequest):
 
         tracker.finish()
 
+        # Retrieve analytics from LangSmith if available, otherwise use internal tracker
+        from ria.langsmith_analytics import LangSmithAnalyticsProvider
+        import asyncio
+
+        langsmith_provider = LangSmithAnalyticsProvider()
+
+        # Wait briefly for LangSmith traces to flush (async tracing may lag)
+        if langsmith_provider.enabled:
+            await asyncio.sleep(2)
+
+        # Get analytics (will use LangSmith if available, or fall back to internal tracker)
+        analytics_data = await langsmith_provider.get_analytics_for_report(
+            report_id=report_id,
+            fallback_analytics=tracker.get_analytics().to_dict(),
+            topic=request.topic,
+            max_age_minutes=10,
+        )
+
         # Save analytics to workspace
-        analytics_data = tracker.get_analytics().to_dict()
         workspace_manager.save_artifact(workspace_dir, "analytics.json", analytics_data)
 
         stats = {

@@ -209,12 +209,12 @@ The **Comparison Agent** is a controlled validation agent, not a fully autonomou
 
    **LangSmith Tracing** (optional, for LLM observability):
    ```bash
+   LANGSMITH_TRACING=true
    LANGSMITH_API_KEY=lsv2_pt_your_key_here
    LANGSMITH_PROJECT=your-project-name
-   LANGSMITH_TRACING_V2=true
    ```
 
-   **Note**: The app works normally without LangSmith. If these variables are not set or tracing is disabled, local analytics tracking will still function.
+   **Note**: The app works normally without LangSmith. If these variables are not set or tracing is disabled, local analytics tracking will still function. Legacy `LANGCHAIN_*` variables are also supported for backward compatibility.
 
 ---
 
@@ -449,23 +449,51 @@ The Research Intelligence Assistant includes comprehensive LLM execution trackin
 - Total execution time from start to finish
 - Helps identify performance bottlenecks
 
-#### 4. LangSmith Tracing (Optional)
-- Optional integration with [LangSmith](https://smith.langchain.com/) for detailed trace analysis
-- Trace IDs and URLs automatically captured when enabled
-- Graceful degradation: App works normally if LangSmith is not configured
+#### 4. LangSmith Analytics Integration (Optional)
 
-**To enable LangSmith tracing**, add to `.env`:
+**Two Analytics Sources:**
+
+1. **LangSmith (Primary)**: When LangSmith tracing is enabled, usage analytics are retrieved directly from LangSmith traces after report generation. This provides authoritative token counts, costs, and timing based on actual LLM API calls.
+
+2. **Internal Tracker (Fallback)**: When LangSmith is unavailable or disabled, the internal analytics tracker monitors LLM calls locally. This ensures analytics are always available.
+
+**The analytics source is clearly indicated in:**
+- UI execution summary (highlighted when using LangSmith)
+- Analytics JSON files (`analytics_source` field)
+- PDF analytics reports
+
+**To enable LangSmith analytics**, add to `.env`:
 ```bash
+LANGSMITH_TRACING=true
 LANGSMITH_API_KEY=lsv2_pt_your_key_here
 LANGSMITH_PROJECT=your-project-name
-LANGSMITH_TRACING_V2=true
 ```
 
-If these variables are missing or `LANGSMITH_TRACING_V2=false`, the app continues with local analytics only.
+**Legacy variables** (also supported for backward compatibility):
+```bash
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=lsv2_pt_your_key_here
+LANGCHAIN_PROJECT=your-project-name
+```
+
+**How it works:**
+- Each report generation is tagged with a unique `report_id`
+- All LLM calls are traced to LangSmith with this `report_id` metadata
+- After generation, the system queries LangSmith for usage data
+- If LangSmith is unavailable, it falls back to internal tracker automatically
+
+**Benefits of LangSmith integration:**
+- Authoritative usage data from LLM API responses
+- Detailed trace URLs for debugging
+- Centralized observability across all runs
+- No manual token counting required
+
+If tracing is disabled or variables are missing, the app continues with local analytics only.
 
 #### 5. Analytics Data Storage
 - Analytics data saved to workspace as `analytics.json`
-- Includes: execution time, token counts, costs, cache status, step breakdown
+- Includes: analytics source, execution time, token counts, costs, cache status, step breakdown
+- LangSmith trace IDs and URLs when available
 - Available for later analysis or export
 
 #### 6. UI Visualization

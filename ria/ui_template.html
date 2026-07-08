@@ -435,6 +435,14 @@
             color: #27ae60;
         }
 
+        .summary-value.source-highlight {
+            color: #3498db;
+            font-weight: 700;
+            background: rgba(52, 152, 219, 0.1);
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
         .chart-row {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
@@ -872,13 +880,18 @@
             const summaryContent = document.getElementById('executionSummaryContent');
             summaryContent.innerHTML = '';
 
+            // Determine analytics source and display it prominently
+            const analyticsSource = analytics.analytics_source || analytics.source || 'Local tracker';
+            const isLangSmith = analyticsSource.includes('LangSmith');
+
             const summaryItems = [
-                { label: 'Current Run Duration', value: `${analytics.total_duration_seconds?.toFixed(2) || 0}s` },
+                { label: 'Analytics Source', value: analyticsSource, isSource: true, highlight: isLangSmith },
+                { label: 'Current Run Duration', value: analytics.total_duration_seconds !== null ? `${analytics.total_duration_seconds?.toFixed(2)}s` : 'Not available' },
                 { label: 'LLM Calls', value: analytics.total_llm_calls || 0 },
-                { label: 'Total Tokens', value: analytics.total_tokens?.toLocaleString() || 0 },
-                { label: 'Prompt Tokens', value: analytics.total_prompt_tokens?.toLocaleString() || 0 },
-                { label: 'Completion Tokens', value: analytics.total_completion_tokens?.toLocaleString() || 0 },
-                { label: 'Estimated Cost', value: `$${analytics.estimated_total_cost?.toFixed(4) || 0}`, isCost: true },
+                { label: 'Total Tokens', value: (analytics.total_tokens !== null && analytics.total_tokens !== undefined) ? analytics.total_tokens.toLocaleString() : 'Not available' },
+                { label: 'Prompt Tokens', value: (analytics.total_prompt_tokens !== null && analytics.total_prompt_tokens !== undefined) ? analytics.total_prompt_tokens.toLocaleString() : 'Not available' },
+                { label: 'Completion Tokens', value: (analytics.total_completion_tokens !== null && analytics.total_completion_tokens !== undefined) ? analytics.total_completion_tokens.toLocaleString() : 'Not available' },
+                { label: 'Estimated Cost', value: (analytics.estimated_total_cost !== null && analytics.estimated_total_cost !== undefined) ? `$${analytics.estimated_total_cost.toFixed(4)}` : 'Not available', isCost: true },
                 { label: 'Cache Status', value: analytics.cache_status || 'N/A' },
                 { label: 'Papers Found', value: analytics.papers_found || 0 }
             ];
@@ -886,9 +899,10 @@
             summaryItems.forEach(item => {
                 const summaryDiv = document.createElement('div');
                 summaryDiv.className = 'summary-item';
+                const valueClass = item.isCost ? 'cost' : (item.isSource && item.highlight ? 'source-highlight' : '');
                 summaryDiv.innerHTML = `
                     <div class="summary-label">${item.label}</div>
-                    <div class="summary-value ${item.isCost ? 'cost' : ''}">${item.value}</div>
+                    <div class="summary-value ${valueClass}">${item.value}</div>
                 `;
                 summaryContent.appendChild(summaryDiv);
             });

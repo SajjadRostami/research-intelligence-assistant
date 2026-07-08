@@ -574,10 +574,11 @@ class MetricBankAgent:
         if existing:
             metric = self.metrics[existing]
             return {
-                "metric_name": metric.metric_name,
+                "name": metric.metric_name,  # UI expects "name" field
                 "description": metric.description,
                 "category": metric.category,
                 "source": metric.source,
+                "score": self._calculate_metric_score(metric, ""),  # Add score for consistency
                 "selected_count": metric.selected_count,
                 "custom_added_count": metric.custom_added_count,
                 "priority_score": metric.priority_score,
@@ -991,8 +992,30 @@ class MetricBankAgent:
             return
 
         try:
+            # Check if file is empty or invalid
+            file_size = self.storage_path.stat().st_size
+            if file_size == 0:
+                logger.info("Metric usage data file is empty, initializing fresh")
+                self.metrics = {}
+                return
+
             with open(self.storage_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
+                content = f.read().strip()
+
+                # Handle empty content
+                if not content:
+                    logger.info("Metric usage data file is empty, initializing fresh")
+                    self.metrics = {}
+                    return
+
+                # Parse JSON
+                data = json.loads(content)
+
+                # Validate it's a dict
+                if not isinstance(data, dict):
+                    logger.warning("Metric usage data is not a dictionary, initializing fresh")
+                    self.metrics = {}
+                    return
 
             self.metrics = {
                 key: MetricUsageData.model_validate(value)
@@ -1000,8 +1023,11 @@ class MetricBankAgent:
             }
 
             logger.info(f"Loaded {len(self.metrics)} metrics from adaptive storage")
+        except json.JSONDecodeError as e:
+            logger.warning(f"Invalid JSON in metric usage data: {e}. Initializing fresh.")
+            self.metrics = {}
         except Exception as e:
-            logger.error(f"Failed to load metric usage data: {e}")
+            logger.error(f"Failed to load metric usage data: {e}. Initializing fresh.")
             self.metrics = {}
 
     def _save(self) -> None:

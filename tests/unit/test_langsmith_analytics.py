@@ -123,7 +123,7 @@ async def test_langsmith_enabled_no_api_key(fallback_analytics):
 
 @pytest.mark.asyncio
 async def test_langsmith_successful_retrieval(fallback_analytics, mock_langsmith_runs):
-    """Test successful LangSmith analytics retrieval with current variables."""
+    """Test successful LangSmith analytics retrieval with step aggregation."""
     with patch.dict('os.environ', {
         'LANGSMITH_TRACING': 'true',
         'LANGSMITH_API_KEY': 'test-key',
@@ -162,8 +162,85 @@ async def test_langsmith_successful_retrieval(fallback_analytics, mock_langsmith
                 assert result["trace_id"] == "trace-123"
                 assert "trace_url" in result
 
-                # Verify steps data
-                assert len(result["steps"]) == 2
+                # Verify steps data - both "llm_chat" and "llm_chat_json" are normalized to "Other LLM Steps"
+                # and aggregated into a single step with combined metrics
+                assert len(result["steps"]) == 1
+                assert result["steps"][0]["step_name"] == "Other LLM Steps"
+                assert result["steps"][0]["llm_calls"] == 2
+                assert result["steps"][0]["prompt_tokens"] == 1000
+                assert result["steps"][0]["completion_tokens"] == 500
+                assert result["steps"][0]["total_tokens"] == 1500
+                # Duration should be summed: 120 + 80 = 200
+                assert result["steps"][0]["duration_seconds"] == 200.0
+
+
+@pytest.mark.asyncio
+async def test_langsmith_distinct_steps_not_aggregated(fallback_analytics):
+    """Test that distinct step names produce multiple grouped steps."""
+    now = datetime.utcnow()
+
+    class MockRun:
+        def __init__(self, name, trace_id, prompt_tokens, completion_tokens, duration_seconds):
+            self.name = name
+            self.trace_id = trace_id
+            self.start_time = now - timedelta(seconds=duration_seconds)
+            self.end_time = now
+            self.outputs = {
+                "usage": {
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "total_tokens": prompt_tokens + completion_tokens,
+                }
+            }
+            self.total_cost = None
+
+    # Create runs with distinct step names that should NOT be aggregated
+    mock_runs = [
+        MockRun("Comparison Matrix Generation", "trace-456", 300, 150, 60),
+        MockRun("executive_summary", "trace-456", 400, 200, 90),
+        MockRun("result_ranking", "trace-456", 300, 150, 50),
+    ]
+
+    with patch.dict('os.environ', {
+        'LANGSMITH_TRACING': 'true',
+        'LANGSMITH_API_KEY': 'test-key',
+        'LANGSMITH_PROJECT': 'test-project',
+    }, clear=False):
+        with patch('ria.langsmith_analytics.LANGSMITH_AVAILABLE', True):
+            with patch('ria.langsmith_analytics.Client') as mock_client_class:
+                mock_client = Mock()
+                mock_client.list_runs.return_value = mock_runs
+                mock_client_class.return_value = mock_client
+
+                provider = LangSmithAnalyticsProvider()
+                provider.enabled = True
+                provider.client = mock_client
+
+                result = await provider.get_analytics_for_report(
+                    report_id="test-456",
+                    fallback_analytics=fallback_analytics,
+                    topic="AI Safety",
+                )
+
+                # Verify analytics source
+                assert result["source"] == "LangSmith"
+
+                # Verify total aggregated counts
+                assert result["total_llm_calls"] == 3
+                assert result["total_prompt_tokens"] == 1000
+                assert result["total_completion_tokens"] == 500
+                assert result["total_tokens"] == 1500
+
+                # Verify that distinct steps are NOT aggregated - should have 3 separate steps
+                assert len(result["steps"]) == 3
+
+                # Extract step names
+                step_names = {step["step_name"] for step in result["steps"]}
+                assert step_names == {"Comparison Matrix", "Executive Summary", "Result Ranking"}
+
+                # Verify each step has exactly 1 LLM call (not aggregated)
+                for step in result["steps"]:
+                    assert step["llm_calls"] == 1
 
 
 @pytest.mark.asyncio

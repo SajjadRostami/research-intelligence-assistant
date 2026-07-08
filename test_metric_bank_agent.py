@@ -193,12 +193,12 @@ def test_get_smart_suggestions(temp_storage):
     assert len(suggestions) <= 10
 
     # AI Support should rank high due to usage
-    ai_suggestions = [s for s in suggestions if "AI" in s["metric_name"]]
+    ai_suggestions = [s for s in suggestions if "AI" in s["name"]]
     assert len(ai_suggestions) > 0
 
     # Check suggestion structure
     first = suggestions[0]
-    assert "metric_name" in first
+    assert "name" in first
     assert "description" in first
     assert "category" in first
     assert "final_score" in first
@@ -224,7 +224,7 @@ def test_smart_suggestions_ignore_inactive(temp_storage):
     )
 
     # Inactive metric should not appear
-    suggested_names = [s["metric_name"] for s in suggestions]
+    suggested_names = [s["name"] for s in suggestions]
     assert metric_name not in suggested_names
 
 
@@ -298,7 +298,7 @@ def test_get_metric_by_name(temp_storage):
     metric = agent.get_metric_by_name("AI Support")
 
     assert metric is not None
-    assert metric["metric_name"] == "AI Support"
+    assert metric["name"] == "AI Support"
     assert metric["source"] == "default"
     assert "description" in metric
     assert "category" in metric
@@ -398,7 +398,7 @@ def test_suggestion_reason_generation(temp_storage):
     )
 
     # Find AI Support in suggestions
-    ai_suggestion = next((s for s in suggestions if s["metric_name"] == "AI Support"), None)
+    ai_suggestion = next((s for s in suggestions if s["name"] == "AI Support"), None)
 
     assert ai_suggestion is not None
     assert "reason" in ai_suggestion
@@ -422,8 +422,8 @@ def test_topic_relevance_boost(temp_storage):
     )
 
     # AI Support should rank higher than GPU Support due to topic relevance
-    ai_index = next((i for i, s in enumerate(suggestions) if s["metric_name"] == "AI Support"), None)
-    gpu_index = next((i for i, s in enumerate(suggestions) if s["metric_name"] == "GPU Support"), None)
+    ai_index = next((i for i, s in enumerate(suggestions) if s["name"] == "AI Support"), None)
+    gpu_index = next((i for i, s in enumerate(suggestions) if s["name"] == "GPU Support"), None)
 
     if ai_index is not None and gpu_index is not None:
         assert ai_index < gpu_index, "AI Support should rank higher due to topic relevance"
@@ -536,8 +536,50 @@ def test_repeated_ignored_metrics_deactivate(temp_storage):
         include_fresh_llm_suggestions=False
     )
 
-    suggested_names = [s["metric_name"] for s in suggestions]
+    suggested_names = [s["name"] for s in suggestions]
     assert metric_name not in suggested_names
+
+
+def test_empty_usage_json_file(temp_storage):
+    """Test that empty usage JSON file doesn't crash."""
+    # Create empty file
+    Path(temp_storage).write_text("", encoding="utf-8")
+
+    # Should initialize without error
+    agent = MetricBankAgent(storage_path=temp_storage)
+    assert len(agent.metrics) == 0
+
+    # Should still be able to initialize defaults
+    agent.initialize_defaults()
+    assert len(agent.metrics) > 0
+
+
+def test_invalid_usage_json_file(temp_storage):
+    """Test that invalid JSON file is handled gracefully."""
+    # Create file with invalid JSON
+    Path(temp_storage).write_text("not valid json {]}", encoding="utf-8")
+
+    # Should initialize without error
+    agent = MetricBankAgent(storage_path=temp_storage)
+    assert len(agent.metrics) == 0
+
+    # Should still be able to initialize defaults
+    agent.initialize_defaults()
+    assert len(agent.metrics) > 0
+
+
+def test_non_dict_usage_json_file(temp_storage):
+    """Test that non-dict JSON is handled gracefully."""
+    # Create file with array instead of dict
+    Path(temp_storage).write_text("[]", encoding="utf-8")
+
+    # Should initialize without error
+    agent = MetricBankAgent(storage_path=temp_storage)
+    assert len(agent.metrics) == 0
+
+    # Should still be able to initialize defaults
+    agent.initialize_defaults()
+    assert len(agent.metrics) > 0
 
 
 if __name__ == "__main__":

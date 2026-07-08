@@ -102,10 +102,12 @@ def test_metric_bank_agent_direct():
 
     for suggestion in suggestions:
         print(f"Agent returned: {suggestion.keys()}")
-        # The agent currently returns 'metric_name', not 'name'
-        # This is the root cause of the bug
-        assert "metric_name" in suggestion or "name" in suggestion, (
-            f"Metric missing both 'metric_name' and 'name': {suggestion}"
+        # After fix: agent should return 'name' field (not 'metric_name')
+        assert "name" in suggestion, (
+            f"Metric missing 'name' field: {suggestion}"
+        )
+        assert suggestion["name"] is not None and suggestion["name"] != "", (
+            f"Metric has invalid name: {suggestion}"
         )
 
 

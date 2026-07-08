@@ -53,3 +53,4 @@ app.py.backup
 *.pdf
 pdf_exports/
 sample_pdf_exports/
+data/metric_bank_usage.json

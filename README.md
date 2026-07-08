@@ -1,1109 +1,154 @@
 # Research Intelligence Assistant
 
-A FastAPI-based research and benchmarking assistant that searches for scientific papers and patents, suggests comparison metrics, validates evaluations using an agent-based validation layer, and generates structured reports with professional PDF exports.
-
----
-
-## What It Does
-
-Research Intelligence Assistant automates the research discovery and benchmarking process:
-
-1. **Searches** for relevant patents and scientific papers based on a research topic
-2. **Suggests** domain-relevant comparison metrics using a ChromaDB-backed metric bank
-3. **Evaluates** sources against selected metrics using LLM-powered analysis
-4. **Validates** the comparison matrix using the Comparison Agent with rule-based and LLM validation
-5. **Generates** a structured Markdown report with:
-   - Executive summary with validation insights
-   - Top-ranked papers and patents
-   - Validated comparison matrix with visual heatmap
-   - Open-access paper detection and links
-6. **Exports** professional PDFs for research reports and LLM execution analytics
-7. **Tracks** LLM usage, token counts, estimated costs, and execution analytics
+A Python-based assistant that generates structured benchmark reports from a research topic by collecting papers, patents, metrics, comparison matrices, analytics, and exportable reports.
 
 ---
 
 ## Key Features
 
-### Browser UI
-- Clean, step-by-step web interface at `/ui`
-- Metric suggestion workflow
-- Custom metric support
-- Research mode selection (cached vs. fresh)
-- Real-time statistics and report rendering
-- PDF export buttons for research reports and analytics
-
-### Data Sources
-- **Patents**: SerpAPI Patent Search (or mock adapter for testing)
-- **Papers**: Semantic Scholar with open-access detection
-- Automatic deduplication and ranking
-
-### Adaptive Metric Bank with Metric Bank Agent
-- **Metric Bank Agent**: Intelligent adaptive metric suggestion system that learns from user behavior
-- **Usage Tracking**: Records which metrics users select, add as custom, or ignore
-- **Smart Ranking**: Promotes frequently selected and custom-added metrics
-- **Deprioritization**: Lowers priority of repeatedly ignored metrics
-- **Fresh Suggestions**: Generates new topic-relevant metrics using LLM
-- **Duplicate Handling**: Normalizes and merges similar metrics (e.g., "AI", "Artificial Intelligence", "AI Support")
-- **Persistence**: Stores metric usage data locally in JSON format
-- **Default Metrics**: Includes comprehensive default metrics for common domains (AI, GPU, VR/AR, Medical, Performance, etc.)
-- **Backward Compatible**: Works alongside legacy ChromaDB metric bank
-
-### ChromaDB Research Cache
-- Caches fetched papers and patents to avoid repeated API calls
-- Topic normalization and exact match lookup
-- "Research from scratch" mode to bypass cache
-- Cache status endpoint
-
-### Agent System
-
-#### Comparison Agent (Validation Layer)
-- **Agent-based matrix validation**: Reviews each cell in the comparison matrix before final report generation
-- **Rule-based validation**: Applies deterministic rules for well-defined metrics (Open Access, XPBD Support, Patent/IP, VR/HMD, Haptic Support, AI Support)
-- **LLM-based validation**: Used for ambiguous cases when rule-based validation is insufficient
-- **Evidence verification**: Ensures YES/PART/NO values are justified by source metadata (title, abstract, relevance analysis, source type)
-- **Change tracking**: Logs corrections with explanations of what changed and why
-- **Confidence scoring**: Provides validation confidence for each cell and overall matrix
-- **Fallback safety**: If validation fails, uses original matrix without blocking report generation
-- **No hallucination**: Agent is instructed to prefer PART or NO when evidence is weak or missing
-
-#### Metric Bank Agent (Adaptive Learning)
-- **Learns from behavior**: Tracks user selections, custom additions, and ignored metrics
-- **Smart suggestions**: Ranks metrics using learned behavior + topic relevance + LLM-generated fresh ideas
-- **Promotes frequently used**: Metrics that users select or add multiple times rank higher
-- **Deprioritizes ignored**: Metrics repeatedly ignored get lower priority or deactivated
-- **Handles duplicates**: Normalizes similar metrics (AI, Artificial Intelligence, AI Support) into one
-- **Persistent memory**: Stores usage data across sessions for continuous improvement
-
-### Executive Summary Comparison Matrix
-- Row-based heatmap coloring by overall source coverage
-- **✅ Fully Matched**, **⚠️ Partially Covered**, **❌ Not Covered** status badges (validated by Comparison Agent)
-- Linked source labels (Paper 1, Patent 1, etc.) jump to full citations
-- Metric coverage row shows column-wise average scores
-- Evidence tooltips on hover
-- Optional validation summary in executive summary
-
-### Report Rendering
-- Markdown + embedded HTML for rich formatting
-- Uses validated comparison matrix from Comparison Agent
-- Includes ranked sources, metadata, and validation insights
-- Displays cache status and open-access paper counts
-
-### PDF Export
-- **Research Report PDF**: Compact professional design with title, comparison matrix, top papers/patents, and references
-- **LLM Usage Analytics PDF**: Execution summary, token usage, estimated costs, step breakdown, and workflow visualization
-- **No secrets exposed**: API keys, prompts, and credentials are never included in PDFs
-- **Cost disclaimer**: All costs are clearly labeled as estimates, not official invoices
-- Clean, presentation-ready output for sharing research findings
-
-### LLM Observability and Analytics
-- **Token Usage Tracking**: Monitors prompt tokens, completion tokens, and total tokens for all LLM calls
-- **Cost Estimation**: Calculates estimated costs based on model pricing (labeled as estimates)
-- **Execution Timing**: Tracks duration for each pipeline step (including Comparison Agent validation)
-- **LangSmith Integration** (optional): Full tracing integration with LangSmith for detailed observability
-  - Automatic trace creation for every LLM call
-  - Unique `report_id` linking all calls in a generation
-  - Trace URLs for debugging prompt/response history
-  - Analytics retrieved from LangSmith API with fallback to local tracker
-  - Support for both current (`LANGSMITH_*`) and legacy (`LANGCHAIN_*`) variables
-- **Dual Analytics Sources**: LangSmith traces (authoritative) or local tracker (fallback)
-- **Workflow Visualization**: Shows the complete pipeline execution flow in the UI
-- **Interactive Charts**: Duration by step, cost by step, token distribution, prompt vs completion tokens
-- **Validation Metrics**: Tracks cells reviewed, cells changed, and validation confidence from Comparison Agent
+- Scientific paper and patent retrieval
+- Adaptive metric suggestions using ChromaDB and user feedback
+- Source ranking and comparison matrix generation
+- Agent-based matrix validation (Metric Bank Agent + Comparison Agent)
+- PDF report export with visual heatmaps
+- LangSmith analytics and tracing (optional)
+- Local web UI with step-by-step workflow
 
 ---
 
-## Architecture
+## Architecture Overview
 
-### Multi-Agent Workflow
+The application uses a two-agent structure:
 
-```
-User Input (Browser UI)
-    │
-    ▼
-FastAPI Backend
-    │
-    ├── /suggest-metrics → MetricsBank (ChromaDB)
-    ├── /cache/status    → ResearchCache (ChromaDB)
-    ├── /generate        → Pipeline:
-    │       │
-    │       ├── ResearchCache (lookup or fetch)
-    │       ├── SearchOrchestrator (patents + papers)
-    │       ├── RankingEngine (LLM scoring + deduplication)
-    │       ├── MetricsBank (selected + custom metrics)
-    │       ├── ComparisonMatrixGenerator (initial LLM evaluation)
-    │       ├── ComparisonAgent (validation layer) ← AGENT VALIDATION
-    │       └── ReportRenderer (Markdown + HTML with validated matrix)
-    │
-    ├── /export-research-pdf → PDFExporter (research report)
-    └── /export-usage-pdf    → PDFExporter (analytics report)
-```
+- **Metric Bank Agent**: Manages adaptive metric suggestions using ChromaDB and learns from user behavior
+- **Comparison Agent**: Validates and improves comparison matrix cells using rule-based and LLM validation
 
-**Comparison Agent Validation Flow:**
+The pipeline coordinates search, ranking, matrix generation, validation, analytics tracking, and PDF export.
 
-```
-Initial Matrix (from ComparisonMatrixGenerator)
-    │
-    ▼
-For each cell (source × metric):
-    │
-    ├── Rule-Based Validation
-    │   ├── Open Access metric → Check is_open_access / pdf_url
-    │   ├── XPBD Support → Keyword matching (XPBD, PBD, position-based)
-    │   ├── Patent/IP → Source type validation
-    │   ├── VR/HMD → Keyword matching (VR, HMD, virtual reality)
-    │   ├── Haptic Support → Keyword matching (haptic device, force feedback)
-    │   └── AI Support → Keyword matching (AI, ML, deep learning)
-    │
-    ├── LLM-Based Validation (if rule-based insufficient)
-    │   └── Validate ambiguous cells with structured LLM call
-    │
-    └── Change Tracking
-        ├── Log corrections (old status → new status)
-        ├── Record reason for change
-        └── Track confidence score
-    │
-    ▼
-Validated Matrix
-    │
-    └── Used in Report + PDF Export
-```
-
-The **Comparison Agent** is a controlled validation agent, not a fully autonomous multi-agent system. It acts as a critic that reviews the initial matrix and corrects unsupported evaluations before report generation.
-
-### Core Components
-
-- **FastAPI app** (`app.py`): REST API with `/ui`, `/generate`, `/suggest-metrics`, `/cache/status`, `/export-research-pdf`, `/export-usage-pdf` endpoints
-- **Adapters** (`ria/adapters/`): SerpAPI patents, Semantic Scholar papers
-- **ChromaDB Metric Bank** (`ria/metrics_bank.py`): Persistent metric storage
-- **ChromaDB Research Cache** (`ria/research_cache.py`): Caches fetched papers/patents
-- **Comparison Matrix Generator** (`ria/comparison_matrix.py`): LLM-based source evaluation (initial matrix)
-- **Comparison Agent** (`ria/agents/comparison_agent.py`): Validates matrix cells with rule-based and LLM validation
-- **Report Renderer** (`ria/report.py`): Markdown + HTML report generation (uses validated matrix)
-- **PDF Exporter** (`ria/pdf_export.py`): Professional PDF generation for reports and analytics
-- **Analytics Tracker** (`ria/analytics.py`): Tracks LLM usage, costs, and execution metrics
-- **UI Template** (`ria/ui_template.html`): Interactive browser interface
+**Core Components:**
+- `app.py`: FastAPI REST API with browser UI
+- `ria/adapters/`: SerpAPI patents, Semantic Scholar papers
+- `ria/metrics_bank.py`: ChromaDB metric storage with adaptive learning
+- `ria/research_cache.py`: ChromaDB research cache
+- `ria/comparison_matrix.py`: Initial matrix generation
+- `ria/agents/comparison_agent.py`: Matrix validation layer
+- `ria/report.py`: Markdown + HTML report renderer
+- `ria/pdf_export.py`: PDF generation for reports and analytics
+- `ria/analytics.py`: LLM usage and cost tracking
 
 ---
 
 ## Installation
 
-### Prerequisites
+**Prerequisites:** Python 3.10+
 
-- Python 3.10+
-- Virtual environment (recommended)
-
-### Steps
-
-1. **Clone the repository**:
+1. Clone the repository:
    ```bash
    git clone https://github.com/SajjadRostami/research-intelligence-assistant.git
    cd research-intelligence-assistant
    ```
 
-2. **Create and activate a virtual environment**:
+2. Create and activate a virtual environment:
    ```bash
    python -m venv .venv
    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
    ```
 
-3. **Install dependencies**:
+3. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **Create environment variables**:
-
-   Create a `.env` file in the project root:
-
+4. Create a `.env` file in the project root:
    ```bash
-   # .env
+   # Required
    OPENAI_API_KEY=your_openai_key_here
    SERPAPI_API_KEY=your_serpapi_key_here
-   ```
-
-   **Note**: Do not commit `.env` with real keys. Use `.env.example` for templates.
-
-   Optional environment variables:
-   - `OPENAI_BASE_URL`: Custom OpenAI-compatible endpoint (default: OpenAI)
-   - `LLM_MODEL`: Model to use (default: `claude-haiku`)
-   - `SEMANTIC_SCHOLAR_API_KEY`: For higher Semantic Scholar rate limits
-
-   **LangSmith Tracing** (optional, for LLM observability):
-   ```bash
+   
+   # Optional
+   OPENAI_BASE_URL=your_custom_endpoint  # For OpenAI-compatible endpoints
+   LLM_MODEL=claude-haiku                 # Default model
+   SEMANTIC_SCHOLAR_API_KEY=your_key      # For higher rate limits
+   
+   # LangSmith (optional, for LLM observability)
    LANGSMITH_TRACING=true
    LANGSMITH_API_KEY=lsv2_pt_your_key_here
    LANGSMITH_PROJECT=research-intelligence-assistant
    ```
 
-   **Legacy LangChain Variables** (also supported for backward compatibility):
-   ```bash
-   LANGCHAIN_TRACING_V2=true
-   LANGCHAIN_API_KEY=lsv2_pt_your_key_here
-   LANGCHAIN_PROJECT=research-intelligence-assistant
-   ```
-
-   **Note**: The app works normally without LangSmith. If these variables are not set or tracing is disabled, local analytics tracking will still function.
+   **Note:** Do not commit `.env` with real keys. The app works normally without LangSmith.
 
 ---
 
 ## Running the Application
 
-### Start the FastAPI Server
+Start the FastAPI server:
 
 ```bash
 uvicorn app:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-### Open the Browser UI
-
-Navigate to:
+Open your browser and navigate to:
 
 ```
 http://127.0.0.1:8000/ui
 ```
 
-### Running with LangSmith Enabled
+**UI Workflow:**
 
-If you configured LangSmith in your `.env` file:
+1. Enter a research topic and set max results per adapter
+2. Choose research mode (cached vs. fresh)
+3. Click **Suggest Metrics**
+4. Review and select metrics (or add custom ones)
+5. Click **Generate Report**
+6. View the report with comparison matrix, analytics, and export options
+
+---
+
+## Using LangSmith
+
+LangSmith provides optional LLM tracing and observability. When enabled:
+
+- Every LLM call is traced with a unique `report_id`
+- Analytics are retrieved from LangSmith API (with fallback to local tracker)
+- Trace URLs are available in the UI for debugging
+- Token counts and costs come directly from LLM API responses
+
+To enable LangSmith, add these variables to your `.env`:
 
 ```bash
-# Verify environment variables are set
-cat .env | grep LANGSMITH
-
-# Start the server (will automatically use LangSmith if configured)
-uvicorn app:app --host 127.0.0.1 --port 8000 --reload
-```
-
-Check the terminal output when the app starts - you should NOT see warnings about LangSmith import errors if configured correctly.
-
-After generating a report, check that analytics show **"Analytics Source: LangSmith"** instead of "Local tracker".
-
----
-
-## UI Workflow
-
-### Step 1: Enter Research Topic
-
-1. Enter a research topic (e.g., "XPBD soft body simulation")
-2. Set max results per adapter (default: 3)
-3. Choose research mode:
-   - **Use cached results if available**: Reuses cached data from previous searches
-   - **Research from scratch**: Fetches fresh data and updates cache
-4. Click **Suggest Metrics**
-
-### Step 2: Select Comparison Metrics
-
-1. Review suggested metrics from the metric bank
-2. Click metrics to select/deselect
-3. Add custom metrics via the input field
-4. Click **Generate Report**
-
-### Step 3: View Report
-
-- **Statistics panel** shows:
-  - Total items found
-  - Patents/papers breakdown
-  - Open-access paper count
-  - Cache status
-
-- **Research Report** includes:
-  - Executive summary
-  - Top-ranked papers (with open-access links)
-  - Top-ranked patents
-  - **Comparison Matrix** with heatmap coloring
-  - Metric coverage summary
-
-- **LLM Execution Summary** displays:
-  - Total execution time
-  - Total LLM calls (including Comparison Agent validation calls)
-  - Token usage (prompt, completion, total)
-  - Estimated cost (labeled as estimate)
-  - Cache status
-  - Papers found
-  - Validation metrics (cells reviewed, cells changed, confidence score)
-
-- **Execution Analytics Charts**:
-  - Duration by Step (bar chart, includes Comparison Agent step)
-  - Cost by Step (bar chart, estimated, includes validation costs)
-  - Token Distribution by Step (doughnut chart)
-  - Prompt vs Completion Tokens (stacked bar chart)
-
-- **Workflow Pipeline** shows:
-  - Visual timeline of all executed steps (including validation)
-  - Duration, tokens, cost per step
-  - Status indicators
-
-- **Export Buttons**:
-  - Export Research Report PDF (with validated matrix)
-  - Export LLM Usage Analytics PDF
-
----
-
-## Cache Behavior
-
-### First Search for a Topic
-
-- Fetches fresh papers and patents from APIs
-- Saves metadata to ChromaDB (`chroma_db/research/`)
-- Report generated from fetched results
-
-### Repeated Search (Same Topic)
-
-- **Cached mode**: Loads cached metadata instantly (no API calls)
-- **Fresh mode**: Fetches new results and updates cache
-
-### ChromaDB Directories
-
-- `chroma_db/metrics/`: Metric bank storage
-- `chroma_db/research/`: Research cache storage
-
-**Note**: These directories contain local generated data. Add to `.gitignore`.
-
----
-
-## Comparison Agent
-
-### Overview
-
-The **Comparison Agent** is a validation layer that reviews the comparison matrix before the final report is generated. It acts as a critic that verifies whether each YES/PART/NO evaluation is justified by the available evidence.
-
-### Responsibility
-
-The Comparison Agent:
-- Reviews the initial source comparison matrix generated by `ComparisonMatrixGenerator`
-- Checks each source against each selected metric
-- Validates whether each YES / PART / NO value is supported by evidence
-- Corrects unsupported or incorrect values
-- Logs what changed and why
-- Provides a confidence score for the validation
-
-### Evaluation Definitions
-
-- **YES (✅ / full)**: Clear and explicit evidence supports the metric in the source metadata
-- **PART (⚠️ / partial)**: Partial, indirect, or related evidence supports the metric
-- **NO (❌ / none)**: No clear evidence supports the metric
-
-### Evidence Sources
-
-The Comparison Agent bases its validation on:
-- Source title
-- Source abstract or summary
-- Relevance analysis explanation
-- Source type (paper vs. patent)
-- Metadata (DOI, patent number, venue, authors, publication date)
-- Flags (is_open_access, pdf_url)
-- Selected metric definitions
-
-The agent **does not hallucinate** and is instructed to prefer **PART** or **NO** when evidence is weak or missing.
-
-### Rule-Based Validation
-
-The Comparison Agent includes deterministic rule-based validation for well-defined metrics:
-
-#### Open Access
-- **YES**: if `is_open_access` flag is true OR `pdf_url` exists
-- **NO**: if neither flag is set
-
-#### XPBD Support
-- **YES**: if title or relevance analysis explicitly mentions "XPBD" or "Extended Position Based Dynamics"
-- **PART**: if mentions "position-based dynamics", "PBD", or "constraint-based simulation"
-- **NO**: otherwise
-
-#### Patent / IP Coverage
-- **YES**: if source type is patent
-- **PART**: if paper discusses patents or IP
-- **NO**: otherwise
-
-#### VR HMD Integration
-- **YES**: if mentions "VR", "HMD", "head-mounted display", "virtual reality", "Oculus", or "HTC Vive"
-- **PART**: if mentions "simulation", "training", or "immersive" (context-dependent)
-- **NO**: otherwise
-
-#### Haptic Robot Support
-- **YES**: if mentions "haptic device", "haptic robot", "force feedback device", "haptic interface", or "robotic haptics"
-- **PART**: if mentions "haptic feedback", "haptic", "force feedback", or "tactile"
-- **NO**: otherwise
-
-#### AI Support
-- **YES**: if mentions "AI", "machine learning", "deep learning", "neural network", "learning-based", or "ML"
-- **PART**: if mentions "optimization", "automated", "intelligent", or "adaptive" (context-dependent)
-- **NO**: otherwise
-
-### LLM-Based Validation
-
-When rule-based validation is insufficient or unavailable for a metric, the Comparison Agent can use LLM-based validation:
-
-- **Input**: Source context, metric name, current status, current evidence, metric description
-- **Output**: Structured JSON with validated status, confidence, evidence, and reason for change
-- **Safety**: Falls back to original evaluation if LLM call fails
-- **Temperature**: 0.2 (low temperature for consistency)
-- **Instructions**: "Do not hallucinate. Base your decision ONLY on the provided evidence."
-
-LLM-based validation does not replace rule-based validation—it complements it for ambiguous cases.
-
-### Validation Output
-
-Validation results include:
-
-- **validated_matrix**: List of `SourceMetricEvaluation` objects with corrected status values
-- **changes**: List of `ValidationChange` objects with old status, new status, and reason
-- **validation_summary**: Human-readable summary of validation results
-- **confidence_score**: Overall confidence score (0.0 to 1.0)
-- **cells_reviewed**: Total number of matrix cells reviewed
-- **cells_changed**: Total number of matrix cells corrected
-
-### Workspace Artifacts
-
-Validation generates the following workspace files:
-
-- `comparison_evaluations_initial.json`: Initial matrix before validation
-- `comparison_evaluations.json`: Validated matrix after Comparison Agent
-- `comparison_validation.json`: Validation result with changes and summary
-
-**Note**: These are local generated files and should not be committed to git.
-
-### Fallback Behavior
-
-If Comparison Agent validation fails for any reason:
-- The original matrix from `ComparisonMatrixGenerator` is used
-- Report generation continues without blocking
-- A warning is logged but the pipeline completes successfully
-
----
-
-## LLM Observability and Analytics
-
-The Research Intelligence Assistant includes comprehensive LLM execution tracking and observability features.
-
-### Features
-
-#### 1. Token Usage Tracking
-- Tracks **prompt tokens**, **completion tokens**, and **total tokens** for every LLM call
-- Per-step breakdown showing token usage across the pipeline
-- Extracted directly from OpenAI-compatible API responses
-
-#### 2. Cost Estimation
-- Calculates estimated costs based on model pricing
-- Supports multiple models: Claude (Haiku, Sonnet, Opus), GPT-4, GPT-3.5, etc.
-- Per-step cost breakdown
-- **Note**: Costs are estimates based on approximate pricing and should not be used for billing
-
-#### 3. Execution Timing
-- Tracks duration for each pipeline step
-- Total execution time from start to finish
-- Helps identify performance bottlenecks
-
-#### 4. LangSmith Integration (Optional)
-
-LangSmith provides detailed tracing and observability for LLM calls. When enabled, the Research Intelligence Assistant integrates with LangSmith to track and analyze every LLM interaction.
-
-**Two Analytics Sources:**
-
-1. **LangSmith (Primary)**: When LangSmith tracing is enabled, usage analytics are retrieved directly from LangSmith traces after report generation. This provides authoritative token counts, costs, and timing based on actual LLM API calls.
-
-2. **Internal Tracker (Fallback)**: When LangSmith is unavailable or disabled, the internal analytics tracker monitors LLM calls locally. This ensures analytics are always available.
-
-**The analytics source is clearly indicated in:**
-- UI execution summary (shows "Analytics Source: LangSmith" or "Analytics Source: Local tracker")
-- Analytics JSON files (`analytics_source` field)
-- PDF analytics reports (source label in header)
-
-##### Setup Instructions
-
-**Step 1: Install LangSmith** (already in requirements.txt):
-```bash
-pip install langsmith>=0.1.0
-```
-
-**Step 2: Get LangSmith API Key**
-1. Create a free account at [smith.langchain.com](https://smith.langchain.com)
-2. Navigate to Settings → API Keys
-3. Create a new API key (starts with `lsv2_pt_`)
-4. Create or select a project name (e.g., `research-intelligence-assistant`)
-
-**Step 3: Add Environment Variables**
-
-Add to your `.env` file:
-
-```bash
-# Current LangSmith variables (recommended)
 LANGSMITH_TRACING=true
-LANGSMITH_API_KEY=lsv2_pt_your_actual_key_here
+LANGSMITH_API_KEY=lsv2_pt_your_key_here
 LANGSMITH_PROJECT=research-intelligence-assistant
 ```
 
-Or use legacy LangChain variables (also supported):
-```bash
-# Legacy LangChain variables (backward compatibility)
-LANGCHAIN_TRACING_V2=true
-LANGCHAIN_API_KEY=lsv2_pt_your_actual_key_here
-LANGCHAIN_PROJECT=research-intelligence-assistant
-```
+After generating a report, check that the UI shows **"Analytics Source: LangSmith"** instead of "Local tracker".
 
-##### How It Works
+To disable: set `LANGSMITH_TRACING=false` or remove the variables entirely.
 
-**Tracing Flow:**
-1. When you generate a report, the system creates a unique `report_id` (e.g., `rpt_abc123def456`)
-2. Every LLM call during that generation is traced to LangSmith with metadata:
-   - `report_id`: Links all calls to the same generation
-   - `topic`: Research topic being investigated
-   - `workflow_name`: "research_intelligence_assistant"
-3. Each LLM call creates a `RunTree` object with:
-   - **Inputs**: Messages, temperature, model name
-   - **Outputs**: LLM response content and token usage
-   - **Timing**: Start time, end time, duration
-   - **Status**: Success or error
-4. After report generation completes, the system queries LangSmith API to retrieve all traces for that `report_id`
-5. Traces are aggregated to produce analytics (total tokens, costs, duration, per-step breakdown)
-6. If LangSmith query fails or times out, it automatically falls back to the internal tracker
-
-**Traced Pipeline Steps:**
-- Initialize Components
-- Check Cache
-- Fetch Research (SearchOrchestrator)
-- Deduplicate Sources
-- Score Sources (multiple LLM calls for ranking)
-- Select Top Sources
-- Generate Metrics (if auto-generated)
-- Evaluate Comparison Matrix (multiple LLM calls)
-- Validate Comparison Matrix (Comparison Agent - rule-based + optional LLM)
-- Generate Report
-
-##### Benefits of LangSmith Integration
-
-- **Authoritative Token Counts**: Usage data comes directly from LLM API responses (no estimation)
-- **Detailed Trace URLs**: Click through to see full prompt/response history for debugging
-- **Centralized Dashboard**: View all runs across multiple report generations
-- **Error Debugging**: See exactly which LLM call failed and why
-- **Performance Analysis**: Compare latency across different runs
-- **No Manual Counting**: Token usage automatically extracted from traces
-
-##### Verifying LangSmith is Working
-
-After generating a report with LangSmith enabled:
-
-1. Check the UI execution summary - should say **"Analytics Source: LangSmith"** (not "Local tracker")
-2. Look for a **trace URL** in the analytics panel
-3. Check the `workspaces/<topic>/analytics.json` file - should have:
-   ```json
-   {
-     "analytics_source": "LangSmith",
-     "langsmith_trace_id": "abc123...",
-     "langsmith_trace_url": "https://smith.langchain.com/..."
-   }
-   ```
-4. Click the trace URL to view the full execution trace in LangSmith dashboard
-
-##### Disabling LangSmith
-
-To disable LangSmith tracing and use local analytics only:
-
-**Option 1**: Set tracing to `false` in `.env`:
-```bash
-LANGSMITH_TRACING=false
-```
-
-**Option 2**: Remove or comment out the variables:
-```bash
-# LANGSMITH_TRACING=true
-# LANGSMITH_API_KEY=lsv2_pt_your_key_here
-# LANGSMITH_PROJECT=research-intelligence-assistant
-```
-
-**Option 3**: Delete the environment variables entirely
-
-The app will continue to work normally with local analytics tracking. You'll see **"Analytics Source: Local tracker"** in the UI.
-
-##### Troubleshooting LangSmith
-
-**Problem: Analytics says "Local tracker (LangSmith tracing not enabled)"**
-
-**Cause**: LangSmith environment variables not configured
-
-**Solution**:
-1. Check your `.env` file contains:
-   ```bash
-   LANGSMITH_TRACING=true
-   LANGSMITH_API_KEY=lsv2_pt_your_key_here
-   LANGSMITH_PROJECT=research-intelligence-assistant
-   ```
-2. Verify the API key is valid (starts with `lsv2_pt_`)
-3. Restart the FastAPI server: `uvicorn app:app --reload`
-4. The `.env` file must be in the project root directory
 
 ---
 
-**Problem: Analytics says "Local tracker (No LangSmith traces found for this report)"**
+## Tests
 
-**Cause**: Traces are not appearing in LangSmith or query failed
+Run all tests:
 
-**Solution**:
-1. Check the LangSmith project name matches exactly:
-   ```bash
-   echo $LANGSMITH_PROJECT
-   # Should output: research-intelligence-assistant
-   ```
-2. Verify you can access the project at [smith.langchain.com](https://smith.langchain.com)
-3. Check API key permissions (must have read/write access)
-4. Wait 10-15 seconds after generation - traces may be delayed
-5. Check for errors in terminal output during report generation
-
----
-
-**Problem: "ImportError: No module named 'langsmith'"**
-
-**Cause**: LangSmith package not installed
-
-**Solution**:
 ```bash
-pip install langsmith>=0.1.0
-# Or reinstall all dependencies:
-pip install -r requirements.txt
+pytest -q
 ```
 
 ---
 
-**Problem: Traces appear in LangSmith but analytics still shows "Local tracker"**
+## Output Files
 
-**Cause**: Analytics retrieval timing or query filtering issue
+Generated reports and runtime data are stored locally:
 
-**Solution**:
-1. Check the report ID in `analytics.json` - does it match traces in LangSmith?
-2. Verify traces have metadata:
-   - `report_id`: Should match the generation
-   - `topic`: Research topic
-   - `workflow_name`: "research_intelligence_assistant"
-3. Try increasing max age: Traces may be older than 10-minute default window
-4. Check LangSmith project name is exactly correct (case-sensitive)
+- **PDF Exports**: `pdf_exports/` (research reports and analytics)
+- **Workspaces**: `workspaces/<topic>/` (Markdown reports, JSON data, analytics)
+- **ChromaDB**: `chroma_db/metrics/` and `chroma_db/research/` (metric bank and research cache)
+- **Metric Bank Usage**: `data/metric_bank_usage.json` (adaptive learning data)
 
----
-
-**Problem: Environment variables not loaded**
-
-**Cause**: `.env` file not being read or shell environment conflicts
-
-**Solution**:
-1. Verify `.env` file exists in project root:
-   ```bash
-   ls -la .env
-   ```
-2. Check file format (no spaces around `=`):
-   ```bash
-   LANGSMITH_TRACING=true
-   # NOT: LANGSMITH_TRACING = true
-   ```
-3. Restart the application completely (kill and relaunch)
-4. Verify variables are loaded:
-   ```bash
-   # In Python shell or add to app.py temporarily:
-   import os
-   print(os.getenv("LANGSMITH_TRACING"))
-   print(os.getenv("LANGSMITH_API_KEY"))
-   print(os.getenv("LANGSMITH_PROJECT"))
-   ```
-
----
-
-**Problem: Token counts are zero or missing**
-
-**Cause**: OpenAI-compatible API may not return usage data
-
-**Solution**:
-1. Check if your LLM provider returns token usage in responses
-2. Verify `response.usage` is populated in LLM responses
-3. If provider doesn't return usage, local tracker will estimate (may not match LangSmith)
-4. Consider using OpenAI or Anthropic directly for accurate token counts
-
----
-
-**Problem: Legacy variables not working**
-
-**Cause**: Naming convention confusion
-
-**Solution**:
-Use **current** variable names (recommended):
-```bash
-LANGSMITH_TRACING=true
-LANGSMITH_API_KEY=lsv2_pt_...
-LANGSMITH_PROJECT=research-intelligence-assistant
-```
-
-Or **legacy** variable names (supported):
-```bash
-LANGCHAIN_TRACING_V2=true
-LANGCHAIN_API_KEY=lsv2_pt_...
-LANGCHAIN_PROJECT=research-intelligence-assistant
-```
-
-**Do NOT mix** `LANGSMITH_TRACING` with `LANGCHAIN_API_KEY` - use consistent naming.
-
-#### 5. Analytics Data Storage
-- Analytics data saved to workspace as `analytics.json`
-- Includes: analytics source, execution time, token counts, costs, cache status, step breakdown
-- LangSmith trace IDs and URLs when available
-- Available for later analysis or export
-
-#### 6. UI Visualization
-After generating a report, the UI displays:
-
-**LLM Execution Summary:**
-- Total duration, LLM calls, tokens, estimated cost
-- Cache status and data counts
-
-**Interactive Charts:**
-- **Duration by Step**: Horizontal bar chart showing time spent per pipeline step
-- **Cost by Step**: Horizontal bar chart showing estimated cost per step
-- **Token Distribution**: Doughnut chart showing token usage across steps
-- **Prompt vs Completion Tokens**: Stacked bar chart comparing input vs output tokens
-
-**Workflow Pipeline:**
-- Visual timeline showing all executed steps
-- Status indicators, duration, token counts, and costs per step
-
-### Tracked Pipeline Steps
-
-1. **Initialize Components** - Setup LLM client, cache, workspace
-2. **Check Cache** - Look up cached results
-3. **Fetch Research** - SearchOrchestrator (if cache miss)
-4. **Deduplicate Sources** - Remove duplicate papers/patents
-5. **Score Sources** - LLM-based relevance scoring (multiple calls)
-6. **Select Top Sources** - Select top N papers and patents
-7. **Generate Metrics** - Auto-generate comparison metrics (if not selected)
-8. **Evaluate Comparison Matrix** - LLM evaluation of sources against metrics (multiple calls)
-9. **Validate Comparison Matrix** - Comparison Agent validates each cell (rule-based + optional LLM)
-10. **Generate Report** - Render final Markdown report with validated matrix
-
-### Cost Estimation Models
-
-The system uses approximate pricing per 1,000 tokens:
-
-| Model | Prompt Tokens | Completion Tokens |
-|-------|---------------|-------------------|
-| Claude Haiku | $0.00025 | $0.00125 |
-| Claude Sonnet | $0.003 | $0.015 |
-| Claude Opus | $0.015 | $0.075 |
-| GPT-4o-mini | $0.00015 | $0.0006 |
-| GPT-4o | $0.01 | $0.03 |
-| GPT-4 | $0.03 | $0.06 |
-| GPT-3.5 | $0.0005 | $0.0015 |
-
-**Important**: These are estimates. Actual costs may vary. Do not use for billing purposes.
-
-### Privacy and Security
-
-- **No API keys exposed**: API keys are never sent to the frontend or included in logs/PDFs
-- **No prompts logged**: User prompts and LLM responses are not stored in analytics (only metadata)
-- **Local tracking**: All analytics data stored locally in workspace directories
-- **Optional tracing**: LangSmith integration is completely optional
-
----
-
-## API Endpoints
-
-### `GET /`
-
-Health check endpoint.
-
-**Response**:
-```json
-{
-  "status": "running",
-  "message": "Research Intelligence Assistant is running",
-  "version": "0.1.0"
-}
-```
-
-### `GET /health`
-
-Detailed health check with API key status.
-
-**Response**:
-```json
-{
-  "status": "healthy",
-  "api_keys": {
-    "serpapi": true,
-    "openai": true
-  },
-  "llm_model": "claude-haiku",
-  "base_url": "default"
-}
-```
-
-### `GET /ui`
-
-Browser-based UI for the research assistant.
-
-### `POST /generate`
-
-Generate a research report.
-
-**Request Body**:
-```json
-{
-  "topic": "XPBD soft body simulation",
-  "max_results_per_adapter": 10,
-  "selected_metrics": ["AI Support", "GPU Support", "Real-Time Performance"],
-  "custom_metrics": ["Custom Feature"],
-  "use_cache": true,
-  "force_fresh_research": false
-}
-```
-
-**Response**:
-```json
-{
-  "success": true,
-  "message": "Report generated successfully",
-  "report_content": "... Markdown content ...",
-  "workspace_dir": "./workspaces/xpbd-soft-body-simulation",
-  "stats": {
-    "total_raw_items": 20,
-    "patents_found": 10,
-    "papers_found": 10,
-    "open_access_papers_found": 5,
-    "ranked_patents": 5,
-    "ranked_papers": 5,
-    "metrics_generated": 3,
-    "cache_status": "Cached results"
-  }
-}
-```
-
-### `POST /suggest-metrics`
-
-Suggest metrics for a research topic.
-
-**Request Body**:
-```json
-{
-  "topic": "XPBD soft body simulation",
-  "max_metrics": 10
-}
-```
-
-**Response**:
-```json
-{
-  "success": true,
-  "suggested_metrics": [
-    {
-      "metric_id": "xpbd_support",
-      "name": "XPBD Support",
-      "description": "Whether the source uses Extended Position Based Dynamics",
-      "category": "Algorithm",
-      "usage_count": 5,
-      "reason": "Relevant to 'XPBD soft body simulation' (similarity score: 0.95)"
-    }
-  ]
-}
-```
-
-### `POST /cache/status`
-
-Get cache status for a topic.
-
-**Request Body**:
-```json
-{
-  "topic": "XPBD soft body simulation"
-}
-```
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "topic": "XPBD soft body simulation",
-    "cached": true,
-    "patents_count": 5,
-    "papers_count": 5,
-    "open_access_papers_count": 3,
-    "last_fetched_at": "2026-07-07T12:34:56",
-    "total_items": 10
-  }
-}
-```
-
-### `POST /export-research-pdf`
-
-Export research report as a professional PDF.
-
-**Request Body**:
-```json
-{
-  "topic": "XPBD soft body simulation",
-  "report_content": "... Markdown content ...",
-  "stats": { ... },
-  "analytics": { ... },
-  "comparison_evaluations": [ ... ],
-  "metric_names": ["XPBD Support", "GPU Support"],
-  "ranked_papers": [ ... ],
-  "ranked_patents": [ ... ]
-}
-```
-
-**Response**: PDF file download
-
-**Features**:
-- Compact professional header with topic and date
-- Validated comparison matrix with color-coded cells
-- Top papers section with citations
-- Top patents section with assignees
-- Full references
-- Does not expose API keys or secrets
-
-### `POST /export-usage-pdf`
-
-Export LLM usage analytics as a professional PDF.
-
-**Request Body**:
-```json
-{
-  "topic": "XPBD soft body simulation",
-  "analytics": {
-    "total_duration_seconds": 12.5,
-    "total_llm_calls": 15,
-    "total_tokens": 12000,
-    "estimated_total_cost": 0.0456,
-    "steps": [ ... ]
-  }
-}
-```
-
-**Response**: PDF file download
-
-**Features**:
-- Execution summary with timing and token counts
-- Estimated costs (clearly labeled as estimates)
-- Per-step breakdown
-- Workflow pipeline visualization
-- LangSmith trace information (if available)
-- Does not expose API keys or prompts
-
----
-
-## Testing
-
-### Run All Tests
-
-```bash
-python -m pytest
-```
-
-**Expected Result**: 120 tests passing (as of 2026-07-07)
-
-### Run Specific Tests
-
-```bash
-# Unit tests
-python -m pytest tests/unit/ -v
-
-# Comparison Agent tests
-python -m pytest test_comparison_agent.py -v
-python -m pytest test_comparison_agent_integration.py -v
-
-# PDF export tests
-python -m pytest tests/unit/test_pdf_export.py tests/unit/test_research_pdf_fixes.py -v
-
-# Semantic Scholar adapter
-python -m pytest tests/unit/test_semantic_scholar.py -v
-```
-
-### Comparison Agent Tests
-
-```bash
-# Rule-based validation tests
-python -m pytest test_comparison_agent.py::TestComparisonAgentRuleBased -v
-
-# LLM-based validation tests (requires OPENAI_API_KEY)
-python -m pytest test_comparison_agent.py::TestComparisonAgentLLMBased -v
-
-# Integration tests (full pipeline with validation)
-python -m pytest test_comparison_agent_integration.py -v
-```
-
-### Manual Testing
-
-```bash
-# Test full pipeline with Comparison Agent
-python test_mvp_e2e.py
-```
-
----
-
-## Git and Security Notes
-
-### Do NOT Commit
-
-Add these to `.gitignore`:
-
-```
-# Environment variables
-.env
-
-# Python cache
-__pycache__/
-*.pyc
-*.pyo
-
-# ChromaDB data
-chroma_db/
-test_chroma_db/
-
-# Workspaces and generated artifacts
-workspaces/
-
-# PDF exports
-pdf_exports/
-sample_pdf_exports/
-
-# Backups
-*.backup
-```
-
-**Important**: Workspace directories (`workspaces/`) contain local generated files such as:
-- `comparison_evaluations_initial.json`
-- `comparison_evaluations.json`
-- `comparison_validation.json`
-- `analytics.json`
-- `report.md`
-
-These are local artifacts and should never be committed.
-
-### Protect Your API Keys
-
-- Never commit `.env` files with real API keys
-- Use `.env.example` as a template
-- Store real keys in environment variables or secret managers
-- API keys are never exposed in PDFs, logs, or frontend responses
-
----
-
-## Technology Stack
-
-### Backend
-- **FastAPI**: Modern async web framework
-- **Pydantic v2**: Data validation and serialization
-- **HTTPX**: Async HTTP client for API calls
-
-### AI
-- **OpenAI SDK**: LLM integration (Claude via OpenAI-compatible endpoints)
-- **Structured Output**: JSON response models with Pydantic
-- **LangSmith**: Optional LLM observability and tracing (langsmith>=0.1.0)
-
-### Storage
-- **ChromaDB**: Vector database for metric bank and research cache
-- **Embeddings**: Similarity-based search for metrics and papers
-
-### External APIs
-- **SerpAPI**: Patent search
-- **Semantic Scholar**: Scientific paper search with open-access detection
-
-### Testing
-- **Pytest**: Unit and integration tests
-- **Hypothesis**: Property-based testing
+**Note:** These directories are excluded from Git via `.gitignore`, along with `.env` files.
 
 ---
 
@@ -1111,132 +156,26 @@ These are local artifacts and should never be committed.
 
 ```
 research-intelligence-assistant/
-├── app.py                      # FastAPI application
-├── requirements.txt            # Python dependencies
-├── .env                        # Environment variables (not committed)
-├── .gitignore                  # Git ignore rules
-├── ria/                        # Core package
-│   ├── __init__.py
-│   ├── adapters/               # Search adapters
-│   │   ├── base.py
-│   │   ├── semantic_scholar.py
-│   │   ├── serpapi_patents.py
-│   │   └── mock_patent.py
-│   ├── agents/                 # Agent-based components
-│   │   ├── __init__.py
-│   │   └── comparison_agent.py # Comparison matrix validator
-│   ├── metrics_bank.py         # ChromaDB metric bank
-│   ├── research_cache.py       # ChromaDB research cache
-│   ├── comparison_matrix.py    # Matrix generation
-│   ├── llm.py                  # LLM client wrapper
-│   ├── metrics.py              # Metric generation
-│   ├── models.py               # Pydantic models
-│   ├── orchestrator.py         # Search orchestration
-│   ├── ranking.py              # Ranking engine
-│   ├── report.py               # Report renderer
-│   ├── pdf_export.py           # PDF generation
-│   ├── analytics.py            # Execution analytics tracker
-│   ├── langsmith_analytics.py  # LangSmith trace retrieval
-│   ├── workspace.py            # Workspace management
-│   └── ui_template.html        # Browser UI template
-├── tests/                      # Test suite
-│   └── unit/
-│       ├── test_pdf_export.py
-│       ├── test_research_pdf_fixes.py
-│       └── ...
-├── test_comparison_agent.py    # Comparison Agent tests
-├── test_comparison_agent_integration.py  # Integration tests
-├── chroma_db/                  # ChromaDB data (not committed)
-│   ├── metrics/
-│   └── research/
-├── workspaces/                 # Generated reports (not committed)
-└── pdf_exports/                # Generated PDFs (not committed)
+├── app.py                          # FastAPI application
+├── requirements.txt                # Python dependencies
+├── .env                            # Environment variables (not committed)
+├── ria/                            # Core package
+│   ├── adapters/                   # SerpAPI patents, Semantic Scholar papers
+│   ├── agents/                     # Comparison Agent (validation layer)
+│   ├── metrics_bank.py             # ChromaDB metric bank with adaptive learning
+│   ├── research_cache.py           # ChromaDB research cache
+│   ├── comparison_matrix.py        # Matrix generation
+│   ├── llm.py                      # LLM client wrapper
+│   ├── report.py                   # Report renderer
+│   ├── pdf_export.py               # PDF generation
+│   ├── analytics.py                # Execution analytics tracker
+│   ├── langsmith_analytics.py      # LangSmith trace retrieval
+│   └── ui_template.html            # Browser UI template
+├── tests/                          # Test suite
+├── chroma_db/                      # ChromaDB data (not committed)
+├── workspaces/                     # Generated reports (not committed)
+└── pdf_exports/                    # Generated PDFs (not committed)
 ```
-
----
-
-## Example Use Case
-
-**Input Topic**:
-```
-XPBD soft body simulation algorithm
-```
-
-**Selected Metrics**:
-- XPBD Support
-- GPU Support
-- Real-Time Performance
-- Open Access
-
-**Output**:
-1. **Executive Summary**: High-level overview of research landscape with validation insights
-2. **Validated Comparison Matrix**:
-   - Reviewed and corrected by Comparison Agent
-   - Row-based heatmap coloring (green = high coverage, red = low coverage)
-   - Status badges (✅/⚠️/❌) for each metric per source
-   - Linked source labels jump to full citations
-   - Metric coverage row shows average scores
-   - Evidence tooltips on hover
-3. **Top Papers**: 5 ranked papers with citation counts, venues, and open-access links
-4. **Top Patents**: 5 ranked patents with assignees and publication dates
-5. **References**: Full citation details for all sources
-6. **Cache Status**: Reports whether results were cached or freshly fetched
-7. **Validation Summary**: Shows how many cells were reviewed and corrected by the Comparison Agent
-
-**PDF Exports**:
-- **Research Report PDF**: Compact professional design with title, validated matrix, top sources, and references
-- **LLM Usage Analytics PDF**: Execution summary, token usage, estimated costs, and workflow visualization
-
----
-
-## Roadmap
-
-### Completed ✅
-- FastAPI REST API with browser UI
-- ChromaDB metric bank with similarity search
-- ChromaDB research cache with topic normalization
-- Comparison matrix with row-based heatmap coloring
-- Open-access paper detection and PDF links
-- Custom metric support
-- Cache status endpoint
-- **Comparison Agent with rule-based and LLM validation**
-- **Professional PDF exports for research reports and analytics**
-- **LLM usage tracking and cost estimation**
-- **Validation change logging and confidence scoring**
-
-### In Progress 🚧
-- Enhanced metric categorization
-- User feedback loop for metric refinement
-- Additional rule-based validation patterns
-
-### Planned 🔮
-- Additional data sources (ArXiv, Google Patents)
-- Commercial solution discovery
-- Interactive dashboard with filters
-- Multi-source benchmarking
-- Fully autonomous multi-agent research system
-
----
-
-## Project Status
-
-This is a **demo-ready prototype** with production-oriented features, developed as part of an AI Engineering Bootcamp project. It demonstrates:
-- Multi-stage LLM pipeline orchestration
-- Agent-based validation layer
-- ChromaDB-backed caching and similarity search
-- Professional PDF generation
-- LLM observability and cost tracking
-
-The project is suitable for:
-- Research demonstrations
-- Educational purposes
-- Proof-of-concept for research automation
-- Foundation for production-ready systems
-
-**Not recommended for**:
-- Production use without further hardening
-- Mission-critical research workflows
-- Official cost accounting (estimates only)
 
 ---
 
@@ -1245,28 +184,10 @@ The project is suitable for:
 **Sajjad Rostami**  
 PhD in Computer Science / XR / AI Systems
 
-Research Intelligence Assistant was developed as part of an AI Engineering Bootcamp project focused on LLMs, RAG systems, agent-based architectures, and intelligent research automation.
+Developed as part of an AI Engineering Bootcamp project focused on LLMs, RAG systems, agent-based architectures, and intelligent research automation.
 
 ---
 
 ## License
 
 This project is open-source. See [LICENSE](LICENSE) for details.
-
----
-
-## Support
-
-For issues, questions, or contributions:
-- Open an issue on [GitHub](https://github.com/SajjadRostami/research-intelligence-assistant/issues)
-- Submit a pull request
-
----
-
-## Acknowledgments
-
-- **Semantic Scholar**: For providing free academic paper search API
-- **SerpAPI**: For patent search capabilities
-- **ChromaDB**: For vector database and embeddings support
-- **FastAPI**: For modern async web framework
-- **Anthropic Claude**: For LLM-powered analysis

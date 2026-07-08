@@ -896,3 +896,169 @@ This research examines machine learning applications in healthcare.
         # PDF should have reasonable size (current compact design is around 6-7KB)
         assert pdf_path.stat().st_size > 1000  # Smaller than old 8000 threshold, but still substantial
         # Visual inspection recommended: PDF should have compact header with Topic/Date/Mode, not old cover page
+
+
+class TestMetricLabelFormatting:
+    """Tests for PDF metric label formatting and wrapping."""
+
+    @pytest.fixture
+    def exporter(self, tmp_path):
+        """Create a PDF exporter."""
+        output_dir = tmp_path / "pdf_exports"
+        return PDFExporter(output_dir=str(output_dir))
+
+    def test_format_long_metric_labels(self, exporter):
+        """Test that long metric names are shortened for PDF display."""
+        # Test known mappings
+        assert "Surgical\nDomain" in exporter._format_metric_label_for_pdf("Surgical Simulation Domain")
+        assert "Code /\nImpl." in exporter._format_metric_label_for_pdf("Code or Implementation Availability")
+        assert "Haptic\nRobot" in exporter._format_metric_label_for_pdf("Haptic Robot Support")
+        assert "VR HMD" in exporter._format_metric_label_for_pdf("VR HMD Integration")
+
+    def test_format_medium_metric_labels(self, exporter):
+        """Test that medium-length metric names are wrapped appropriately."""
+        # Medium names should be preserved or intelligently wrapped
+        result = exporter._format_metric_label_for_pdf("Real-time Performance")
+        assert "Real-time" in result
+
+        result = exporter._format_metric_label_for_pdf("GPU Support")
+        assert "GPU" in result
+
+    def test_format_short_metric_labels(self, exporter):
+        """Test that short metric names are preserved."""
+        assert exporter._format_metric_label_for_pdf("GPU") == "GPU"
+        assert exporter._format_metric_label_for_pdf("AI") == "AI"
+        assert exporter._format_metric_label_for_pdf("Physics") == "Physics"
+
+    def test_format_unmapped_long_metric(self, exporter):
+        """Test that unmapped long metric names are intelligently truncated."""
+        long_name = "Very Long Unmapped Metric Name That Should Be Shortened"
+        result = exporter._format_metric_label_for_pdf(long_name)
+        # Should be wrapped or truncated
+        assert len(result) < len(long_name)
+        assert "\n" in result or ".." in result
+
+    def test_pdf_matrix_with_many_long_metrics(self, exporter):
+        """Test PDF generation with many long metric names."""
+        topic = "Test Research with Long Metrics"
+        stats = {
+            "total_raw_items": 10,
+            "patents_found": 2,
+            "papers_found": 2,
+            "open_access_papers_found": 1,
+            "metrics_generated": 10,
+            "cache_status": "Fresh",
+        }
+
+        ranked_patents = [
+            {
+                "title": "Test Patent 1",
+                "patent_number": "US1234567",
+                "author_or_assignee": "Test Corp",
+                "publication_date": "2026",
+                "relevance_score": 0.9,
+                "source_url": "https://example.com",
+            },
+        ]
+
+        ranked_papers = [
+            {
+                "title": "Test Paper 1",
+                "author_or_assignee": "Smith, J.",
+                "publication_date": "2026",
+                "venue": "Test Conference",
+                "citation_count": 10,
+                "doi": "10.1234/test1",
+                "is_open_access": True,
+                "relevance_score": 0.85,
+            },
+        ]
+
+        # Many long metric names that should be formatted properly
+        metric_names = [
+            "Surgical Simulation Domain",
+            "Code or Implementation Availability",
+            "Haptic Robot Support",
+            "VR HMD Integration",
+            "Real-time Performance",
+            "Collision Detection",
+            "Deformable Body Simulation",
+            "GPU Support",
+            "AI-based",
+            "Physics-based Simulation",
+        ]
+
+        comparison_evaluations = [
+            {
+                "source_id": "US1234567",
+                "source_title": "Test Patent 1",
+                "overall_score": 0.8,
+                "metric_evaluations": [
+                    {"metric_name": m, "status": "full" if i % 2 == 0 else "partial", "score": 0.8}
+                    for i, m in enumerate(metric_names)
+                ],
+            },
+            {
+                "source_id": "10.1234/test1",
+                "source_title": "Test Paper 1",
+                "overall_score": 0.7,
+                "metric_evaluations": [
+                    {"metric_name": m, "status": "partial" if i % 2 == 0 else "none", "score": 0.5}
+                    for i, m in enumerate(metric_names)
+                ],
+            },
+        ]
+
+        # Should not raise an exception and should generate valid PDF
+        pdf_path = exporter.generate_research_report_pdf(
+            topic=topic,
+            report_content="Test report",
+            stats=stats,
+            comparison_evaluations=comparison_evaluations,
+            metric_names=metric_names,
+            ranked_papers=ranked_papers,
+            ranked_patents=ranked_patents,
+        )
+
+        assert pdf_path.exists()
+        assert pdf_path.suffix == ".pdf"
+        # PDF should be substantial with all the metrics
+        assert pdf_path.stat().st_size > 2000
+
+    def test_matrix_table_uses_paragraph_headers(self, exporter):
+        """Test that matrix table headers use Paragraph objects for proper wrapping."""
+        metric_names = [
+            "Surgical Simulation Domain",
+            "Code or Implementation Availability",
+            "Haptic Robot Support",
+        ]
+
+        ranked_patents = [{
+            "title": "Test Patent",
+            "patent_number": "US123",
+            "relevance_score": 0.9,
+        }]
+
+        ranked_papers = []
+
+        comparison_evaluations = [{
+            "source_id": "US123",
+            "source_title": "Test Patent",
+            "overall_score": 0.8,
+            "metric_evaluations": [
+                {"metric_name": m, "status": "full", "score": 1.0}
+                for m in metric_names
+            ],
+        }]
+
+        matrix_table = exporter._build_comparison_matrix_table_structured(
+            comparison_evaluations,
+            metric_names,
+            ranked_papers,
+            ranked_patents,
+        )
+
+        assert matrix_table is not None
+        # Verify table has proper structure
+        # Header row should contain Paragraph objects
+        # (We can't directly inspect the cells, but table creation should succeed)

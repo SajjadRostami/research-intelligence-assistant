@@ -1755,48 +1755,88 @@ class PDFExporter:
 
         return content[start:end].strip()
 
-    def _shorten_metric_name(self, metric_name: str) -> str:
+    def _format_metric_label_for_pdf(self, metric_name: str) -> str:
         """
-        Shorten long metric names for matrix headers.
+        Format metric label for PDF display with shortened, wrapped text.
+
+        This function shortens long metric names to fit in narrow table columns
+        and adds line breaks for proper wrapping. Only affects PDF display -
+        does not change actual metric names in backend/UI.
 
         Args:
             metric_name: Full metric name
 
         Returns:
-            Shortened metric name
+            Shortened, wrapped metric label suitable for PDF table headers
         """
-        # Mapping from long metric names to short labels
+        # Comprehensive mapping from long metric names to short, wrapped labels
         metric_mapping = {
+            # Surgical/Medical domain metrics
             "Tissue Cutting / Tissue Interaction Support": "Tissue\nCutting",
+            "Surgical Simulation Domain": "Surgical\nDomain",
+            "Surgical Domain": "Surgical\nDomain",
+
+            # Hardware/Integration metrics
             "VR HMD Integration": "VR HMD",
             "Haptic Robot Support": "Haptic\nRobot",
-            "Meshless Method Support": "Meshless",
-            "Surgical Simulation Domain": "Surgical\nDomain",
+            "Haptic Device Support": "Haptic\nDevice",
             "GPU Support": "GPU",
-            "AI-based": "AI",
-            "AI Support": "AI",
-            "Real-time Performance": "Real-time",
-            "Collision Detection": "Collision\nDetect",
-            "Deformable Body Simulation": "Deformable\nBody",
-            "Soft Body Simulation": "Soft Body",
-            "Physics-based": "Physics",
+
+            # Implementation metrics
+            "Code or Implementation Availability": "Code /\nImpl.",
+            "Code Availability": "Code\nAvail.",
+            "Implementation Availability": "Impl.\nAvail.",
+            "Open Source": "Open\nSource",
+
+            # Physics/Simulation methods
+            "Meshless Method Support": "Meshless",
             "XPBD Support": "XPBD",
+            "Collision Detection": "Collision\nDetect.",
+            "Deformable Body Simulation": "Deformable\nBody",
+            "Soft Body Simulation": "Soft\nBody",
+            "Physics-based": "Physics",
+            "Real-time Performance": "Real-time",
+
+            # AI/ML metrics
+            "AI-based": "AI-Based",
+            "AI Support": "AI",
+            "Machine Learning": "ML",
+            "Deep Learning": "Deep\nLearning",
         }
 
-        # Check if exact match exists
+        # Check for exact match
         if metric_name in metric_mapping:
             return metric_mapping[metric_name]
 
-        # Otherwise, truncate and add line break if too long
-        if len(metric_name) > 15:
+        # Smart truncation for unmapped metrics
+        if len(metric_name) > 20:
             # Try to find a good breaking point
+            words = metric_name.split()
+            if len(words) > 2:
+                # Break into two lines at roughly the middle
+                mid = len(words) // 2
+                line1 = " ".join(words[:mid])
+                line2 = " ".join(words[mid:])
+
+                # Ensure each line isn't too long
+                if len(line1) > 15:
+                    line1 = line1[:13] + ".."
+                if len(line2) > 15:
+                    line2 = line2[:13] + ".."
+
+                return f"{line1}\n{line2}"
+            elif len(words) == 2:
+                # Two words - put on separate lines
+                return f"{words[0]}\n{words[1]}"
+            else:
+                # Single long word - truncate
+                return metric_name[:15] + ".."
+        elif len(metric_name) > 12:
+            # Medium length - try to break into two lines
             words = metric_name.split()
             if len(words) > 1:
                 mid = len(words) // 2
                 return "\n".join([" ".join(words[:mid]), " ".join(words[mid:])])
-            else:
-                # Single long word - truncate
-                return metric_name[:12] + "..."
 
         return metric_name
 
@@ -1878,6 +1918,10 @@ class PDFExporter:
         CRITICAL: Label assignment must exactly match the order used in web UI matrix generation.
         Web UI assigns labels based on the ORDER of ranked_papers and ranked_patents lists.
 
+        Fixed: Column headers now use Paragraph objects for proper wrapping.
+        Fixed: Dynamic column widths based on metric count.
+        Fixed: Uses shortened metric labels to prevent overlap.
+
         Args:
             evaluations: List of source evaluation dicts
             metric_names: List of metric names
@@ -1913,9 +1957,40 @@ class PDFExporter:
             label_text = f"Paper {idx}"
             source_labels[source_id] = (label_text, label_text)
 
-        # Build table data with shortened metric names in header
-        shortened_metrics = [self._shorten_metric_name(m) for m in metric_names]
-        header = ["Source"] + shortened_metrics + ["Overall %"]
+        # Build table data with shortened, wrapped metric names in header
+        # CRITICAL FIX: Use Paragraph objects for headers to enable wrapping
+        num_metrics = len(metric_names)
+
+        # Calculate dynamic font size based on metric count
+        if num_metrics > 10:
+            header_font_size = 6
+        elif num_metrics > 7:
+            header_font_size = 6.5
+        else:
+            header_font_size = 7
+
+        # Header paragraph style - centered, wrapped, small font
+        header_style = ParagraphStyle(
+            name='MatrixHeader',
+            parent=self.styles['Normal'],
+            fontSize=header_font_size,
+            textColor=colors.white,
+            alignment=TA_CENTER,
+            leading=header_font_size + 1.5,  # Line spacing for multi-line headers
+            fontName='Helvetica-Bold',
+        )
+
+        # Format metric labels for PDF display
+        formatted_metrics = [self._format_metric_label_for_pdf(m) for m in metric_names]
+
+        # Build header row with Paragraph objects
+        header = [Paragraph("Source", header_style)]
+        for metric_label in formatted_metrics:
+            # Replace \n with <br/> for ReportLab Paragraph
+            metric_label_html = metric_label.replace("\n", "<br/>")
+            header.append(Paragraph(metric_label_html, header_style))
+        header.append(Paragraph("Overall<br/>%", header_style))
+
         table_data = [header]
 
         # Process evaluations (sorted by overall score)
@@ -1999,32 +2074,57 @@ class PDFExporter:
         coverage_row.append("-")
         table_data.append(coverage_row)
 
-        # Create table with dynamic column widths
-        num_cols = len(header)
-        col_width = 6.5 * inch / num_cols  # Fit within page width
-        col_widths = [col_width] * num_cols
+        # Calculate dynamic column widths to prevent overlap
+        # Fixed widths for first and last columns, remaining space divided among metrics
+        available_width = 6.5 * inch  # Usable page width
+        source_col_width = 0.8 * inch  # Fixed width for source labels
+        overall_col_width = 0.65 * inch  # Fixed width for overall %
+
+        # Remaining width for metric columns
+        remaining_width = available_width - source_col_width - overall_col_width
+        num_metric_cols = len(metric_names)
+
+        # Calculate metric column width
+        if num_metric_cols > 0:
+            metric_col_width = remaining_width / num_metric_cols
+
+            # Enforce minimum column width to prevent text crush
+            min_metric_col_width = 0.45 * inch  # Minimum for readability
+            if metric_col_width < min_metric_col_width:
+                # Too many metrics - use minimum width and let table extend
+                # (ReportLab will auto-paginate if needed)
+                metric_col_width = min_metric_col_width
+
+            col_widths = [source_col_width] + [metric_col_width] * num_metric_cols + [overall_col_width]
+        else:
+            col_widths = [source_col_width, overall_col_width]
 
         matrix_table = Table(table_data, colWidths=col_widths, repeatRows=1)
 
         # Apply styling with improved header and clear badge colors
+        # CRITICAL FIX: Headers use Paragraph objects, so FONTNAME/FONTSIZE in TableStyle
+        # won't affect them - those styles are set in ParagraphStyle above
         style_commands = [
             # Header row - dark navy background to stand out from heatmap
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F2937')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 7),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            # Header row padding - extra vertical space for wrapped text
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+            ('TOPPADDING', (0, 0), (-1, 0), 10),
             # Data rows
             ('FONTSIZE', (0, 1), (-1, -1), 7),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 1), (-1, -2), 8),
+            ('TOPPADDING', (0, 1), (-1, -2), 8),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
             # Metric coverage row - light gray background with centered bold text
             ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#e5e7eb')),
             ('TEXTCOLOR', (0, -1), (-1, -1), colors.black),
             ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
             ('ALIGN', (0, -1), (-1, -1), 'CENTER'),  # All Coverage row cells centered
+            ('BOTTOMPADDING', (0, -1), (-1, -1), 6),
+            ('TOPPADDING', (0, -1), (-1, -1), 6),
         ]
 
         # Add row-based heatmap coloring for data rows (skip header and coverage row)
@@ -2063,6 +2163,8 @@ class PDFExporter:
             )
 
         # Add individual cell styling for YES/PART/NO badges
+        # Calculate total columns from header
+        num_cols = len(table_data[0]) if table_data else 0
         for row_idx in range(1, len(table_data) - 1):  # Skip header and coverage row
             for col_idx in range(1, num_cols - 1):  # Skip source and overall columns
                 cell_value = table_data[row_idx][col_idx]

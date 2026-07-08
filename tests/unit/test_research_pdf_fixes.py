@@ -213,7 +213,7 @@ class TestResearchReportPDFFixes:
     def test_metric_name_shortening(self, exporter):
         """Test that long metric names are shortened properly."""
         long_metric = "Tissue Cutting / Tissue Interaction Support"
-        short_metric = exporter._shorten_metric_name(long_metric)
+        short_metric = exporter._format_metric_label_for_pdf(long_metric)
 
         # Should be shortened
         assert len(short_metric) < len(long_metric)
@@ -221,9 +221,9 @@ class TestResearchReportPDFFixes:
         assert "Cutting" in short_metric
 
         # Test other mappings
-        assert exporter._shorten_metric_name("VR HMD Integration") == "VR HMD"
-        assert exporter._shorten_metric_name("Haptic Robot Support") == "Haptic\nRobot"
-        assert exporter._shorten_metric_name("GPU Support") == "GPU"
+        assert exporter._format_metric_label_for_pdf("VR HMD Integration") == "VR HMD"
+        assert exporter._format_metric_label_for_pdf("Haptic Robot Support") == "Haptic\nRobot"
+        assert exporter._format_metric_label_for_pdf("GPU Support") == "GPU"
 
     def test_non_latin_character_handling(self, exporter):
         """Test that non-Latin characters are handled without black squares."""

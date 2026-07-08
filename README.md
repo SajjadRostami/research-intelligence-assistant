@@ -84,7 +84,13 @@ Research Intelligence Assistant automates the research discovery and benchmarkin
 - **Token Usage Tracking**: Monitors prompt tokens, completion tokens, and total tokens for all LLM calls
 - **Cost Estimation**: Calculates estimated costs based on model pricing (labeled as estimates)
 - **Execution Timing**: Tracks duration for each pipeline step (including Comparison Agent validation)
-- **LangSmith Tracing** (optional): Integration with LangSmith for detailed trace analysis
+- **LangSmith Integration** (optional): Full tracing integration with LangSmith for detailed observability
+  - Automatic trace creation for every LLM call
+  - Unique `report_id` linking all calls in a generation
+  - Trace URLs for debugging prompt/response history
+  - Analytics retrieved from LangSmith API with fallback to local tracker
+  - Support for both current (`LANGSMITH_*`) and legacy (`LANGCHAIN_*`) variables
+- **Dual Analytics Sources**: LangSmith traces (authoritative) or local tracker (fallback)
 - **Workflow Visualization**: Shows the complete pipeline execution flow in the UI
 - **Interactive Charts**: Duration by step, cost by step, token distribution, prompt vs completion tokens
 - **Validation Metrics**: Tracks cells reviewed, cells changed, and validation confidence from Comparison Agent
@@ -211,10 +217,17 @@ The **Comparison Agent** is a controlled validation agent, not a fully autonomou
    ```bash
    LANGSMITH_TRACING=true
    LANGSMITH_API_KEY=lsv2_pt_your_key_here
-   LANGSMITH_PROJECT=your-project-name
+   LANGSMITH_PROJECT=research-intelligence-assistant
    ```
 
-   **Note**: The app works normally without LangSmith. If these variables are not set or tracing is disabled, local analytics tracking will still function. Legacy `LANGCHAIN_*` variables are also supported for backward compatibility.
+   **Legacy LangChain Variables** (also supported for backward compatibility):
+   ```bash
+   LANGCHAIN_TRACING_V2=true
+   LANGCHAIN_API_KEY=lsv2_pt_your_key_here
+   LANGCHAIN_PROJECT=research-intelligence-assistant
+   ```
+
+   **Note**: The app works normally without LangSmith. If these variables are not set or tracing is disabled, local analytics tracking will still function.
 
 ---
 
@@ -233,6 +246,22 @@ Navigate to:
 ```
 http://127.0.0.1:8000/ui
 ```
+
+### Running with LangSmith Enabled
+
+If you configured LangSmith in your `.env` file:
+
+```bash
+# Verify environment variables are set
+cat .env | grep LANGSMITH
+
+# Start the server (will automatically use LangSmith if configured)
+uvicorn app:app --host 127.0.0.1 --port 8000 --reload
+```
+
+Check the terminal output when the app starts - you should NOT see warnings about LangSmith import errors if configured correctly.
+
+After generating a report, check that analytics show **"Analytics Source: LangSmith"** instead of "Local tracker".
 
 ---
 
@@ -449,7 +478,9 @@ The Research Intelligence Assistant includes comprehensive LLM execution trackin
 - Total execution time from start to finish
 - Helps identify performance bottlenecks
 
-#### 4. LangSmith Analytics Integration (Optional)
+#### 4. LangSmith Integration (Optional)
+
+LangSmith provides detailed tracing and observability for LLM calls. When enabled, the Research Intelligence Assistant integrates with LangSmith to track and analyze every LLM interaction.
 
 **Two Analytics Sources:**
 
@@ -458,37 +489,238 @@ The Research Intelligence Assistant includes comprehensive LLM execution trackin
 2. **Internal Tracker (Fallback)**: When LangSmith is unavailable or disabled, the internal analytics tracker monitors LLM calls locally. This ensures analytics are always available.
 
 **The analytics source is clearly indicated in:**
-- UI execution summary (highlighted when using LangSmith)
+- UI execution summary (shows "Analytics Source: LangSmith" or "Analytics Source: Local tracker")
 - Analytics JSON files (`analytics_source` field)
-- PDF analytics reports
+- PDF analytics reports (source label in header)
 
-**To enable LangSmith analytics**, add to `.env`:
+##### Setup Instructions
+
+**Step 1: Install LangSmith** (already in requirements.txt):
+```bash
+pip install langsmith>=0.1.0
+```
+
+**Step 2: Get LangSmith API Key**
+1. Create a free account at [smith.langchain.com](https://smith.langchain.com)
+2. Navigate to Settings → API Keys
+3. Create a new API key (starts with `lsv2_pt_`)
+4. Create or select a project name (e.g., `research-intelligence-assistant`)
+
+**Step 3: Add Environment Variables**
+
+Add to your `.env` file:
+
+```bash
+# Current LangSmith variables (recommended)
+LANGSMITH_TRACING=true
+LANGSMITH_API_KEY=lsv2_pt_your_actual_key_here
+LANGSMITH_PROJECT=research-intelligence-assistant
+```
+
+Or use legacy LangChain variables (also supported):
+```bash
+# Legacy LangChain variables (backward compatibility)
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=lsv2_pt_your_actual_key_here
+LANGCHAIN_PROJECT=research-intelligence-assistant
+```
+
+##### How It Works
+
+**Tracing Flow:**
+1. When you generate a report, the system creates a unique `report_id` (e.g., `rpt_abc123def456`)
+2. Every LLM call during that generation is traced to LangSmith with metadata:
+   - `report_id`: Links all calls to the same generation
+   - `topic`: Research topic being investigated
+   - `workflow_name`: "research_intelligence_assistant"
+3. Each LLM call creates a `RunTree` object with:
+   - **Inputs**: Messages, temperature, model name
+   - **Outputs**: LLM response content and token usage
+   - **Timing**: Start time, end time, duration
+   - **Status**: Success or error
+4. After report generation completes, the system queries LangSmith API to retrieve all traces for that `report_id`
+5. Traces are aggregated to produce analytics (total tokens, costs, duration, per-step breakdown)
+6. If LangSmith query fails or times out, it automatically falls back to the internal tracker
+
+**Traced Pipeline Steps:**
+- Initialize Components
+- Check Cache
+- Fetch Research (SearchOrchestrator)
+- Deduplicate Sources
+- Score Sources (multiple LLM calls for ranking)
+- Select Top Sources
+- Generate Metrics (if auto-generated)
+- Evaluate Comparison Matrix (multiple LLM calls)
+- Validate Comparison Matrix (Comparison Agent - rule-based + optional LLM)
+- Generate Report
+
+##### Benefits of LangSmith Integration
+
+- **Authoritative Token Counts**: Usage data comes directly from LLM API responses (no estimation)
+- **Detailed Trace URLs**: Click through to see full prompt/response history for debugging
+- **Centralized Dashboard**: View all runs across multiple report generations
+- **Error Debugging**: See exactly which LLM call failed and why
+- **Performance Analysis**: Compare latency across different runs
+- **No Manual Counting**: Token usage automatically extracted from traces
+
+##### Verifying LangSmith is Working
+
+After generating a report with LangSmith enabled:
+
+1. Check the UI execution summary - should say **"Analytics Source: LangSmith"** (not "Local tracker")
+2. Look for a **trace URL** in the analytics panel
+3. Check the `workspaces/<topic>/analytics.json` file - should have:
+   ```json
+   {
+     "analytics_source": "LangSmith",
+     "langsmith_trace_id": "abc123...",
+     "langsmith_trace_url": "https://smith.langchain.com/..."
+   }
+   ```
+4. Click the trace URL to view the full execution trace in LangSmith dashboard
+
+##### Disabling LangSmith
+
+To disable LangSmith tracing and use local analytics only:
+
+**Option 1**: Set tracing to `false` in `.env`:
+```bash
+LANGSMITH_TRACING=false
+```
+
+**Option 2**: Remove or comment out the variables:
+```bash
+# LANGSMITH_TRACING=true
+# LANGSMITH_API_KEY=lsv2_pt_your_key_here
+# LANGSMITH_PROJECT=research-intelligence-assistant
+```
+
+**Option 3**: Delete the environment variables entirely
+
+The app will continue to work normally with local analytics tracking. You'll see **"Analytics Source: Local tracker"** in the UI.
+
+##### Troubleshooting LangSmith
+
+**Problem: Analytics says "Local tracker (LangSmith tracing not enabled)"**
+
+**Cause**: LangSmith environment variables not configured
+
+**Solution**:
+1. Check your `.env` file contains:
+   ```bash
+   LANGSMITH_TRACING=true
+   LANGSMITH_API_KEY=lsv2_pt_your_key_here
+   LANGSMITH_PROJECT=research-intelligence-assistant
+   ```
+2. Verify the API key is valid (starts with `lsv2_pt_`)
+3. Restart the FastAPI server: `uvicorn app:app --reload`
+4. The `.env` file must be in the project root directory
+
+---
+
+**Problem: Analytics says "Local tracker (No LangSmith traces found for this report)"**
+
+**Cause**: Traces are not appearing in LangSmith or query failed
+
+**Solution**:
+1. Check the LangSmith project name matches exactly:
+   ```bash
+   echo $LANGSMITH_PROJECT
+   # Should output: research-intelligence-assistant
+   ```
+2. Verify you can access the project at [smith.langchain.com](https://smith.langchain.com)
+3. Check API key permissions (must have read/write access)
+4. Wait 10-15 seconds after generation - traces may be delayed
+5. Check for errors in terminal output during report generation
+
+---
+
+**Problem: "ImportError: No module named 'langsmith'"**
+
+**Cause**: LangSmith package not installed
+
+**Solution**:
+```bash
+pip install langsmith>=0.1.0
+# Or reinstall all dependencies:
+pip install -r requirements.txt
+```
+
+---
+
+**Problem: Traces appear in LangSmith but analytics still shows "Local tracker"**
+
+**Cause**: Analytics retrieval timing or query filtering issue
+
+**Solution**:
+1. Check the report ID in `analytics.json` - does it match traces in LangSmith?
+2. Verify traces have metadata:
+   - `report_id`: Should match the generation
+   - `topic`: Research topic
+   - `workflow_name`: "research_intelligence_assistant"
+3. Try increasing max age: Traces may be older than 10-minute default window
+4. Check LangSmith project name is exactly correct (case-sensitive)
+
+---
+
+**Problem: Environment variables not loaded**
+
+**Cause**: `.env` file not being read or shell environment conflicts
+
+**Solution**:
+1. Verify `.env` file exists in project root:
+   ```bash
+   ls -la .env
+   ```
+2. Check file format (no spaces around `=`):
+   ```bash
+   LANGSMITH_TRACING=true
+   # NOT: LANGSMITH_TRACING = true
+   ```
+3. Restart the application completely (kill and relaunch)
+4. Verify variables are loaded:
+   ```bash
+   # In Python shell or add to app.py temporarily:
+   import os
+   print(os.getenv("LANGSMITH_TRACING"))
+   print(os.getenv("LANGSMITH_API_KEY"))
+   print(os.getenv("LANGSMITH_PROJECT"))
+   ```
+
+---
+
+**Problem: Token counts are zero or missing**
+
+**Cause**: OpenAI-compatible API may not return usage data
+
+**Solution**:
+1. Check if your LLM provider returns token usage in responses
+2. Verify `response.usage` is populated in LLM responses
+3. If provider doesn't return usage, local tracker will estimate (may not match LangSmith)
+4. Consider using OpenAI or Anthropic directly for accurate token counts
+
+---
+
+**Problem: Legacy variables not working**
+
+**Cause**: Naming convention confusion
+
+**Solution**:
+Use **current** variable names (recommended):
 ```bash
 LANGSMITH_TRACING=true
-LANGSMITH_API_KEY=lsv2_pt_your_key_here
-LANGSMITH_PROJECT=your-project-name
+LANGSMITH_API_KEY=lsv2_pt_...
+LANGSMITH_PROJECT=research-intelligence-assistant
 ```
 
-**Legacy variables** (also supported for backward compatibility):
+Or **legacy** variable names (supported):
 ```bash
 LANGCHAIN_TRACING_V2=true
-LANGCHAIN_API_KEY=lsv2_pt_your_key_here
-LANGCHAIN_PROJECT=your-project-name
+LANGCHAIN_API_KEY=lsv2_pt_...
+LANGCHAIN_PROJECT=research-intelligence-assistant
 ```
 
-**How it works:**
-- Each report generation is tagged with a unique `report_id`
-- All LLM calls are traced to LangSmith with this `report_id` metadata
-- After generation, the system queries LangSmith for usage data
-- If LangSmith is unavailable, it falls back to internal tracker automatically
-
-**Benefits of LangSmith integration:**
-- Authoritative usage data from LLM API responses
-- Detailed trace URLs for debugging
-- Centralized observability across all runs
-- No manual token counting required
-
-If tracing is disabled or variables are missing, the app continues with local analytics only.
+**Do NOT mix** `LANGSMITH_TRACING` with `LANGCHAIN_API_KEY` - use consistent naming.
 
 #### 5. Analytics Data Storage
 - Analytics data saved to workspace as `analytics.json`
@@ -844,6 +1076,7 @@ These are local artifacts and should never be committed.
 ### AI
 - **OpenAI SDK**: LLM integration (Claude via OpenAI-compatible endpoints)
 - **Structured Output**: JSON response models with Pydantic
+- **LangSmith**: Optional LLM observability and tracing (langsmith>=0.1.0)
 
 ### Storage
 - **ChromaDB**: Vector database for metric bank and research cache
@@ -888,6 +1121,7 @@ research-intelligence-assistant/
 │   ├── report.py               # Report renderer
 │   ├── pdf_export.py           # PDF generation
 │   ├── analytics.py            # Execution analytics tracker
+│   ├── langsmith_analytics.py  # LangSmith trace retrieval
 │   ├── workspace.py            # Workspace management
 │   └── ui_template.html        # Browser UI template
 ├── tests/                      # Test suite

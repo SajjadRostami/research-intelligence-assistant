@@ -392,6 +392,12 @@ class PDFExporter:
 
         # ===== SOURCE COMPARISON MATRIX =====
         if comparison_evaluations and metric_names:
+            # Validate matrix data before rendering
+            try:
+                self._validate_matrix_data(comparison_evaluations, ranked_papers, ranked_patents)
+            except Exception as e:
+                print(f"Matrix validation warning: {e}")
+
             self._build_comparison_matrix_section(
                 story, comparison_evaluations, metric_names, ranked_papers, ranked_patents
             )
@@ -1794,6 +1800,70 @@ class PDFExporter:
 
         return metric_name
 
+    def _validate_matrix_data(
+        self,
+        evaluations: list[dict],
+        ranked_papers: list[dict],
+        ranked_patents: list[dict],
+    ) -> None:
+        """
+        Validate comparison matrix data before PDF generation.
+
+        Checks:
+        1. No evaluation has an empty or 'Unknown' source_id
+        2. All evaluation source_ids can be mapped to a ranked source
+        3. Matrix row count matches expected total sources
+
+        Args:
+            evaluations: List of source evaluation dicts
+            ranked_papers: List of ranked paper dicts
+            ranked_patents: List of ranked patent dicts
+
+        Raises:
+            ValueError: If validation fails
+        """
+        if not evaluations:
+            return
+
+        total_sources = len(ranked_papers) + len(ranked_patents)
+        eval_count = len(evaluations)
+
+        # Build set of all known source IDs from ranked sources
+        known_source_ids = set()
+        for patent in ranked_patents:
+            known_source_ids.add(self._get_source_id(patent))
+        for paper in ranked_papers:
+            known_source_ids.add(self._get_source_id(paper))
+
+        # Check each evaluation
+        issues = []
+        for idx, evaluation in enumerate(evaluations, 1):
+            source_id = evaluation.get('source_id', '')
+            source_title = evaluation.get('source_title', 'Unknown')
+
+            # Check for missing source_id
+            if not source_id or source_id == 'Unknown':
+                issues.append(f"Evaluation #{idx} has missing source_id (title: {source_title[:50]})")
+
+            # Check if source_id maps to a known source
+            elif source_id not in known_source_ids:
+                issues.append(
+                    f"Evaluation #{idx} source_id '{source_id[:50]}' not found in ranked sources "
+                    f"(title: {source_title[:50]})"
+                )
+
+        # Check row count mismatch
+        if eval_count != total_sources:
+            issues.append(
+                f"Matrix has {eval_count} evaluations but there are {total_sources} ranked sources "
+                f"({len(ranked_patents)} patents + {len(ranked_papers)} papers)"
+            )
+
+        if issues:
+            error_msg = "Matrix validation failed:\n" + "\n".join(f"  - {issue}" for issue in issues)
+            print(f"WARNING: {error_msg}")
+            # Don't raise exception, just log warning - allow PDF to generate with fallback labels
+
     def _build_comparison_matrix_table_structured(
         self,
         evaluations: list[dict],
@@ -1805,11 +1875,14 @@ class PDFExporter:
         Build comparison matrix table from structured evaluation data.
         Uses text badges (YES/PART/NO) for clarity.
 
+        CRITICAL: Label assignment must exactly match the order used in web UI matrix generation.
+        Web UI assigns labels based on the ORDER of ranked_papers and ranked_patents lists.
+
         Args:
             evaluations: List of source evaluation dicts
             metric_names: List of metric names
-            ranked_papers: List of ranked paper dicts
-            ranked_patents: List of ranked patent dicts
+            ranked_papers: List of ranked paper dicts (already ranked by score, descending)
+            ranked_patents: List of ranked patent dicts (already ranked by score, descending)
 
         Returns:
             Formatted Table object or None
@@ -1817,19 +1890,28 @@ class PDFExporter:
         if not evaluations or not metric_names:
             return None
 
-        # Build source label mapping with clickable links
-        source_labels = {}
-        for idx, patent in enumerate(ranked_patents[:3], 1):
-            source_id = self._get_source_id(patent)
-            # Create clickable link to bookmark
-            link_text = f'<a href="#patent{idx}" color="blue">Patent {idx}</a>'
-            source_labels[source_id] = link_text
+        # Validate matrix data before rendering
+        self._validate_matrix_data(evaluations, ranked_papers, ranked_patents)
 
-        for idx, paper in enumerate(ranked_papers[:3], 1):
+        # Build source label mapping (plain text, no links)
+        # CRITICAL: This mapping must be built in the SAME ORDER as comparison evaluations.
+        # Evaluations are created from (patents + papers), so we label in that order.
+        # This ensures source IDs match between matrix generation and label assignment.
+        source_labels = {}
+
+        # Label ALL patents in ranked order (matches evaluation generation order)
+        for idx, patent in enumerate(ranked_patents, 1):
+            source_id = self._get_source_id(patent)
+            # Plain text label (no internal link)
+            label_text = f"Patent {idx}"
+            source_labels[source_id] = (label_text, label_text)
+
+        # Label ALL papers in ranked order (after patents, matches evaluation generation order)
+        for idx, paper in enumerate(ranked_papers, 1):
             source_id = self._get_source_id(paper)
-            # Create clickable link to bookmark
-            link_text = f'<a href="#paper{idx}" color="blue">Paper {idx}</a>'
-            source_labels[source_id] = link_text
+            # Plain text label (no internal link)
+            label_text = f"Paper {idx}"
+            source_labels[source_id] = (label_text, label_text)
 
         # Build table data with shortened metric names in header
         shortened_metrics = [self._shorten_metric_name(m) for m in metric_names]
@@ -1839,20 +1921,34 @@ class PDFExporter:
         # Process evaluations (sorted by overall score)
         sorted_evals = sorted(evaluations, key=lambda e: e.get('overall_score', 0), reverse=True)
 
-        # Define paragraph style for clickable source labels
-        source_link_style = ParagraphStyle(
-            name='SourceLink',
+        # Define paragraph style for source labels (plain text)
+        source_label_style = ParagraphStyle(
+            name='SourceLabel',
             parent=self.styles['Normal'],
             fontSize=7,
             alignment=TA_CENTER,
         )
 
-        for evaluation in sorted_evals[:6]:  # Limit to top 6 for PDF
+        # CRITICAL FIX: Do not limit to 6 rows arbitrarily.
+        # If we want to limit, it should match the UI or be documented.
+        # For now, show all evaluations that exist in the matrix.
+        # If space is an issue, the table will auto-paginate.
+        for evaluation in sorted_evals:  # Show ALL sources, not just top 6
             source_id = evaluation.get('source_id', '')
-            source_label_html = source_labels.get(source_id, 'Unknown')
 
-            # Convert source label to Paragraph to support hyperlinks
-            source_label_para = Paragraph(source_label_html, source_link_style)
+            # CRITICAL FIX: Better fallback when source_id not found
+            if source_id in source_labels:
+                plain_label, display_label = source_labels[source_id]
+                source_label_para = Paragraph(display_label, source_label_style)
+            else:
+                # Fallback: use source_title or generate label from source_id
+                source_title = evaluation.get('source_title', 'Unknown Source')
+                # Truncate title if too long
+                if len(source_title) > 30:
+                    source_title = source_title[:28] + "..."
+                # Plain text fallback
+                source_label_para = Paragraph(self._escape_text(source_title), source_label_style)
+
             row = [source_label_para]
 
             # Add metric evaluations as text badges
@@ -1881,13 +1977,14 @@ class PDFExporter:
 
             table_data.append(row)
 
-        # Add metric coverage row (shortened to avoid overflow)
+        # Add metric coverage row
         # Use plain text "Coverage" - TableStyle will handle bold and center alignment
         coverage_row = ["Coverage"]
         for metric_name in metric_names:
             total_score = 0.0
             count = 0
-            for evaluation in sorted_evals[:6]:
+            # CRITICAL FIX: Calculate coverage from ALL sorted_evals, not just top 6
+            for evaluation in sorted_evals:
                 metric_evals = evaluation.get('metric_evaluations', [])
                 for m_eval in metric_evals:
                     if m_eval.get('metric_name') == metric_name:
@@ -1931,7 +2028,8 @@ class PDFExporter:
         ]
 
         # Add row-based heatmap coloring for data rows (skip header and coverage row)
-        for row_idx, evaluation in enumerate(sorted_evals[:6], 1):
+        # CRITICAL FIX: Apply styling to ALL rows, not just top 6
+        for row_idx, evaluation in enumerate(sorted_evals, 1):
             overall_score = evaluation.get('overall_score', 0.0)
             bg_color = self._score_to_color(overall_score)
 

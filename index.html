@@ -403,7 +403,7 @@
                 <a href="#features">Features</a>
                 <a href="#workflow">Workflow</a>
                 <a href="#architecture">Architecture</a>
-                <a href="#roadmap">Roadmap</a>
+                <a href="#status">Status</a>
             </div>
         </nav>
 
@@ -411,17 +411,18 @@
             <div>
                 <div class="badge-row">
                     <span class="badge">Python</span>
-                    <span class="badge">LLM Workflow</span>
-                    <span class="badge">Benchmarking</span>
-                    <span class="badge">Markdown Reports</span>
+                    <span class="badge">FastAPI</span>
+                    <span class="badge">ChromaDB</span>
+                    <span class="badge">Agent Architecture</span>
+                    <span class="badge">PDF Reports</span>
                 </div>
 
-                <h1>AI-powered research intelligence for faster benchmark reports.</h1>
+                <h1>AI-powered research intelligence with adaptive agents and visual reports.</h1>
 
                 <p>
-                    Research Intelligence Assistant is a Python-based tool that transforms a research topic
-                    into a structured benchmark report by collecting, ranking, and organizing scientific papers,
-                    patents, and commercial solution references.
+                    Research Intelligence Assistant is a web-based tool with intelligent agents that transforms a research topic
+                    into a structured benchmark report by collecting, ranking, and comparing scientific papers and patents
+                    across custom metrics with PDF export and analytics.
                 </p>
 
                 <div class="actions">
@@ -462,47 +463,58 @@
             <div class="section-header">
                 <h2>Core Features</h2>
                 <p>
-                    Designed as a clean MVP for research collection, AI-assisted ranking,
-                    human validation, and structured report generation.
+                    A web-based research platform with intelligent agents for adaptive metric learning,
+                    source comparison, PDF export, and LLM analytics tracking.
                 </p>
             </div>
 
             <div class="grid">
                 <div class="card">
-                    <div class="icon">🔎</div>
-                    <h3>Topic-Based Search</h3>
-                    <p>Accepts a research topic from the command line and uses it to collect relevant information.</p>
+                    <div class="icon">🌐</div>
+                    <h3>Web-Based Research Workflow</h3>
+                    <p>Interactive browser interface for entering topics, selecting metrics, generating reports, and exporting results.</p>
                 </div>
 
                 <div class="card">
                     <div class="icon">📚</div>
-                    <h3>Research Collection</h3>
-                    <p>Collects references from scientific papers, patents, and commercial solution sources.</p>
+                    <h3>Paper and Patent Retrieval</h3>
+                    <p>Searches Semantic Scholar for papers and SerpAPI for patents, with intelligent caching using ChromaDB.</p>
                 </div>
 
                 <div class="card">
-                    <div class="icon">🤖</div>
-                    <h3>LLM-Based Ranking</h3>
-                    <p>Uses AI to evaluate relevance and prioritize the most useful results for the report.</p>
+                    <div class="icon">🧠</div>
+                    <h3>Adaptive Metric Bank Agent</h3>
+                    <p>Learns from user behavior to suggest better metrics over time, powered by ChromaDB vector embeddings.</p>
                 </div>
 
                 <div class="card">
                     <div class="icon">✅</div>
-                    <h3>Human Review</h3>
-                    <p>Allows the user to approve, reject, or edit selected results before final generation.</p>
+                    <h3>Comparison Agent</h3>
+                    <p>Validates comparison matrix cells with rule-based and LLM checks to ensure accurate YES/PART/NO evaluations.</p>
                 </div>
 
                 <div class="card">
                     <div class="icon">📊</div>
-                    <h3>Benchmark Table</h3>
-                    <p>Organizes findings into clear comparison tables for easier analysis and decision-making.</p>
+                    <h3>Source Comparison Matrix</h3>
+                    <p>Compares papers and patents across selected metrics with clear YES, PART, or NO coverage indicators.</p>
                 </div>
 
                 <div class="card">
-                    <div class="icon">📝</div>
-                    <h3>Markdown Report</h3>
-                    <p>Generates a structured local report with summary, findings, benchmark metrics, and references.
-                    </p>
+                    <div class="icon">📈</div>
+                    <h3>LangSmith Execution Analytics</h3>
+                    <p>Tracks LLM calls, token usage, cost, and duration by workflow stage with optional LangSmith integration.</p>
+                </div>
+
+                <div class="card">
+                    <div class="icon">📄</div>
+                    <h3>PDF Report Export</h3>
+                    <p>Generates professional PDF reports with executive summary, comparison matrix, sources, and analytics dashboard.</p>
+                </div>
+
+                <div class="card">
+                    <div class="icon">🧪</div>
+                    <h3>Tested Python Pipeline</h3>
+                    <p>Comprehensive Pytest test suite covering adapters, ranking, analytics, PDF export, and agent validation.</p>
                 </div>
             </div>
         </div>
@@ -513,7 +525,7 @@
             <div class="section-header">
                 <h2>Workflow</h2>
                 <p>
-                    A simple pipeline from user input to a structured benchmark report.
+                    A streamlined web interface from research topic to PDF report with intelligent agent assistance.
                 </p>
             </div>
 
@@ -521,37 +533,49 @@
                 <div class="step">
                     <div class="step-number">1</div>
                     <strong>Topic</strong>
-                    <span>User enters a research topic</span>
+                    <span>Enter research topic in web interface</span>
                 </div>
 
                 <div class="step">
                     <div class="step-number">2</div>
-                    <strong>Search</strong>
-                    <span>The system searches selected sources</span>
+                    <strong>Settings</strong>
+                    <span>Choose max results and cache mode</span>
                 </div>
 
                 <div class="step">
                     <div class="step-number">3</div>
-                    <strong>Collect</strong>
-                    <span>Papers, patents, and solutions are gathered</span>
+                    <strong>Metrics</strong>
+                    <span>Get smart metric suggestions from agent</span>
                 </div>
 
                 <div class="step">
                     <div class="step-number">4</div>
-                    <strong>Rank</strong>
-                    <span>LLM evaluates result relevance</span>
+                    <strong>Select</strong>
+                    <span>Review and customize metrics</span>
                 </div>
 
                 <div class="step">
                     <div class="step-number">5</div>
-                    <strong>Review</strong>
-                    <span>User validates the selected results</span>
+                    <strong>Search</strong>
+                    <span>Retrieve papers and patents</span>
                 </div>
 
                 <div class="step">
                     <div class="step-number">6</div>
-                    <strong>Report</strong>
-                    <span>Markdown benchmark report is generated</span>
+                    <strong>Matrix</strong>
+                    <span>Generate comparison matrix</span>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">7</div>
+                    <strong>Analytics</strong>
+                    <span>Review LLM usage and costs</span>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">8</div>
+                    <strong>Export</strong>
+                    <span>Download PDF report</span>
                 </div>
             </div>
         </div>
@@ -562,47 +586,47 @@
             <div class="section-header">
                 <h2>System Architecture</h2>
                 <p>
-                    The MVP is organized around a lightweight CLI workflow with modular research,
-                    ranking, and report-rendering components.
+                    A FastAPI web application with intelligent agents, ChromaDB caching,
+                    and comprehensive analytics tracking throughout the research pipeline.
                 </p>
             </div>
 
             <div class="architecture">
                 <div class="diagram">
                     <div class="diagram-box">
-                        <strong>CLI Interface</strong>
-                        <span>Receives research topic and user validation</span>
+                        <strong>FastAPI Web UI</strong>
+                        <span>Browser interface for research workflow</span>
                     </div>
 
                     <div class="arrow">→</div>
 
                     <div class="diagram-box">
-                        <strong>Research Engine</strong>
-                        <span>Searches papers, patents, and solution references</span>
+                        <strong>Metric Bank Agent</strong>
+                        <span>ChromaDB-powered adaptive metric suggestions</span>
                     </div>
 
                     <div class="diagram-box">
-                        <strong>LLM Ranking Layer</strong>
-                        <span>Scores relevance and extracts benchmark signals</span>
-                    </div>
-
-                    <div class="arrow">→</div>
-
-                    <div class="diagram-box">
-                        <strong>Report Renderer</strong>
-                        <span>Creates executive summary, benchmark table, and references</span>
-                    </div>
-
-                    <div class="diagram-box">
-                        <strong>Local Storage</strong>
-                        <span>Saves generated Markdown report and supporting outputs</span>
+                        <strong>Research Pipeline</strong>
+                        <span>Search, cache, deduplicate, rank sources</span>
                     </div>
 
                     <div class="arrow">→</div>
 
                     <div class="diagram-box">
-                        <strong>Benchmark Report</strong>
-                        <span>Structured output ready for review and sharing</span>
+                        <strong>Comparison Agent</strong>
+                        <span>Matrix validation and improvement</span>
+                    </div>
+
+                    <div class="diagram-box">
+                        <strong>Report + Analytics</strong>
+                        <span>PDF export with execution analytics</span>
+                    </div>
+
+                    <div class="arrow">→</div>
+
+                    <div class="diagram-box">
+                        <strong>ChromaDB Storage</strong>
+                        <span>Metrics bank and research cache</span>
                     </div>
                 </div>
             </div>
@@ -614,29 +638,32 @@
             <div class="section-header">
                 <h2>Technology Stack</h2>
                 <p>
-                    Built with a practical MVP-first approach using Python and AI-assisted analysis.
+                    Built with modern Python web frameworks, vector databases, and intelligent agent architecture.
                 </p>
             </div>
 
             <div class="tech">
                 <div class="tech-item">Python</div>
-                <div class="tech-item">Command Line Interface</div>
-                <div class="tech-item">LLM Ranking</div>
+                <div class="tech-item">FastAPI</div>
+                <div class="tech-item">ChromaDB</div>
+                <div class="tech-item">LangSmith</div>
                 <div class="tech-item">Semantic Scholar</div>
-                <div class="tech-item">Patent Search</div>
-                <div class="tech-item">Markdown</div>
+                <div class="tech-item">SerpAPI</div>
+                <div class="tech-item">ReportLab</div>
+                <div class="tech-item">Chart.js</div>
+                <div class="tech-item">Pytest</div>
                 <div class="tech-item">GitHub Pages</div>
             </div>
         </div>
     </section>
 
-    <section id="roadmap">
+    <section id="status">
         <div class="container">
             <div class="section-header">
-                <h2>Roadmap</h2>
+                <h2>Project Status</h2>
                 <p>
-                    The project starts as a focused MVP and can later evolve into a full research
-                    intelligence platform.
+                    The core platform is feature-complete with intelligent agents, web UI, and PDF export.
+                    Future enhancements focus on advanced analysis capabilities.
                 </p>
             </div>
 
@@ -644,16 +671,16 @@
                 <div class="roadmap-item">
                     <div class="check">✓</div>
                     <div>
-                        <strong>MVP CLI workflow</strong><br />
-                        <span>Topic input, source search, ranking, review, and Markdown output.</span>
+                        <strong>Web UI workflow with intelligent agents</strong><br />
+                        <span>FastAPI interface with Metric Bank Agent and Comparison Agent for adaptive learning.</span>
                     </div>
                 </div>
 
                 <div class="roadmap-item">
                     <div class="check">✓</div>
                     <div>
-                        <strong>Markdown report generation</strong><br />
-                        <span>Executive summary, benchmark table, key findings, and references.</span>
+                        <strong>Interactive dashboard and PDF export</strong><br />
+                        <span>Visual analytics, comparison matrix heatmaps, and professional PDF reports.</span>
                     </div>
                 </div>
 
@@ -661,15 +688,15 @@
                     <div>○</div>
                     <div>
                         <strong>RAG-based document analysis</strong><br />
-                        <span>Analyze uploaded papers, patents, and internal documents.</span>
+                        <span>Analyze uploaded papers, patents, and internal documents with vector search.</span>
                     </div>
                 </div>
 
                 <div class="roadmap-item">
                     <div>○</div>
                     <div>
-                        <strong>PDF and web dashboard export</strong><br />
-                        <span>Generate polished reports and interactive dashboards.</span>
+                        <strong>Multi-language support</strong><br />
+                        <span>Extend research capabilities to non-English papers and patents.</span>
                     </div>
                 </div>
             </div>

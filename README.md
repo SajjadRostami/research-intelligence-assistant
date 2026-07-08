@@ -2,6 +2,8 @@
 
 A Python-based assistant that generates structured benchmark reports from a research topic by collecting papers, patents, metrics, comparison matrices, analytics, and exportable reports.
 
+**[Live Project Page](https://sajjadrostami.github.io/research-intelligence-assistant/)** | **[GitHub Repository](https://github.com/SajjadRostami/research-intelligence-assistant)**
+
 ---
 
 ## Key Features

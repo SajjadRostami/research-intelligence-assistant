@@ -694,11 +694,23 @@
             suggestedMetrics.forEach((metric, index) => {
                 const item = document.createElement('div');
                 item.className = 'metric-item';
-                item.onclick = () => toggleMetric(metric.name, item);
+
+                // Robust metric name extraction with fallback
+                const metricName = metric.name || metric.metric_name || metric.title || "Unnamed Metric";
+                const metricDescription = metric.description || "No description available";
+
+                // Log warning if name was missing
+                if (!metric.name && metric.metric_name) {
+                    console.warn('Metric using legacy "metric_name" field:', metric);
+                } else if (!metric.name && !metric.metric_name) {
+                    console.error('Metric missing name field:', metric);
+                }
+
+                item.onclick = () => toggleMetric(metricName, item);
 
                 item.innerHTML = `
-                    <div class="metric-name">${metric.name}</div>
-                    <div class="metric-description">${metric.description}</div>
+                    <div class="metric-name">${metricName}</div>
+                    <div class="metric-description">${metricDescription}</div>
                 `;
 
                 grid.appendChild(item);
@@ -786,6 +798,7 @@
                         max_results_per_adapter: maxResults,
                         selected_metrics: selectedMetricNames,
                         custom_metrics: customMetrics,
+                        suggested_metrics: suggestedMetrics.map(m => ({name: m.name})),
                         use_cache: useCache,
                         force_fresh_research: forceFresh
                     })

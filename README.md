@@ -37,11 +37,16 @@ Research Intelligence Assistant automates the research discovery and benchmarkin
 - **Papers**: Semantic Scholar with open-access detection
 - Automatic deduplication and ranking
 
-### ChromaDB Metric Bank
-- Persistent storage of comparison metrics with embeddings
-- Similarity-based metric suggestions
-- Default metrics for common domains (AI, GPU, VR/AR, Medical, Performance, etc.)
-- Custom metric storage with usage tracking
+### Adaptive Metric Bank with Metric Bank Agent
+- **Metric Bank Agent**: Intelligent adaptive metric suggestion system that learns from user behavior
+- **Usage Tracking**: Records which metrics users select, add as custom, or ignore
+- **Smart Ranking**: Promotes frequently selected and custom-added metrics
+- **Deprioritization**: Lowers priority of repeatedly ignored metrics
+- **Fresh Suggestions**: Generates new topic-relevant metrics using LLM
+- **Duplicate Handling**: Normalizes and merges similar metrics (e.g., "AI", "Artificial Intelligence", "AI Support")
+- **Persistence**: Stores metric usage data locally in JSON format
+- **Default Metrics**: Includes comprehensive default metrics for common domains (AI, GPU, VR/AR, Medical, Performance, etc.)
+- **Backward Compatible**: Works alongside legacy ChromaDB metric bank
 
 ### ChromaDB Research Cache
 - Caches fetched papers and patents to avoid repeated API calls
@@ -49,7 +54,9 @@ Research Intelligence Assistant automates the research discovery and benchmarkin
 - "Research from scratch" mode to bypass cache
 - Cache status endpoint
 
-### Comparison Agent (Validation Layer)
+### Agent System
+
+#### Comparison Agent (Validation Layer)
 - **Agent-based matrix validation**: Reviews each cell in the comparison matrix before final report generation
 - **Rule-based validation**: Applies deterministic rules for well-defined metrics (Open Access, XPBD Support, Patent/IP, VR/HMD, Haptic Support, AI Support)
 - **LLM-based validation**: Used for ambiguous cases when rule-based validation is insufficient
@@ -58,6 +65,14 @@ Research Intelligence Assistant automates the research discovery and benchmarkin
 - **Confidence scoring**: Provides validation confidence for each cell and overall matrix
 - **Fallback safety**: If validation fails, uses original matrix without blocking report generation
 - **No hallucination**: Agent is instructed to prefer PART or NO when evidence is weak or missing
+
+#### Metric Bank Agent (Adaptive Learning)
+- **Learns from behavior**: Tracks user selections, custom additions, and ignored metrics
+- **Smart suggestions**: Ranks metrics using learned behavior + topic relevance + LLM-generated fresh ideas
+- **Promotes frequently used**: Metrics that users select or add multiple times rank higher
+- **Deprioritizes ignored**: Metrics repeatedly ignored get lower priority or deactivated
+- **Handles duplicates**: Normalizes similar metrics (AI, Artificial Intelligence, AI Support) into one
+- **Persistent memory**: Stores usage data across sessions for continuous improvement
 
 ### Executive Summary Comparison Matrix
 - Row-based heatmap coloring by overall source coverage

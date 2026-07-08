@@ -54,6 +54,7 @@ class GenerateRequest(BaseModel):
     workspace_name: Optional[str] = None
     selected_metrics: Optional[list[str]] = None
     custom_metrics: Optional[list[str]] = None
+    suggested_metrics: Optional[list[dict]] = None
     use_cache: Optional[bool] = True
     force_fresh_research: Optional[bool] = False
 
@@ -161,10 +162,19 @@ async def generate_report(request: GenerateRequest):
         from ria.research_cache import ResearchCache
         from ria.metrics_bank import MetricsBank
         from ria.comparison_matrix import ComparisonMatrixGenerator
+        from ria.agents import MetricBankAgent
 
         research_cache = ResearchCache()
         metrics_bank = MetricsBank()
         metrics_bank.initialize_defaults()
+
+        # Initialize Metric Bank Agent for adaptive suggestions
+        # Pass ChromaDB metrics bank to load initial metrics from
+        metric_bank_agent = MetricBankAgent(
+            llm_client=llm_client,
+            chroma_metrics_bank=metrics_bank
+        )
+        metric_bank_agent.initialize_defaults()
 
         # Initialize workspace
         workspace_manager = WorkspaceManager(base_dir="./workspaces")
@@ -266,30 +276,74 @@ async def generate_report(request: GenerateRequest):
             # Use selected and custom metrics
             all_metric_names = (request.selected_metrics or []) + (request.custom_metrics or [])
 
-            # Increment usage for selected metrics
-            for metric_name in (request.selected_metrics or []):
-                # Find metric ID in metrics bank
-                suggestions = metrics_bank.suggest_metrics(metric_name, max_results=1)
-                if suggestions:
-                    metrics_bank.increment_usage(suggestions[0]["metric_id"])
+            # Record batch feedback (handles selected, custom, AND ignored metrics)
+            if request.suggested_metrics:
+                # Extract metric names from suggested metrics
+                suggested_metric_names = [
+                    m.get("name", m) if isinstance(m, dict) else m
+                    for m in request.suggested_metrics
+                ]
 
-            # Add custom metrics to bank
-            for custom_metric in (request.custom_metrics or []):
-                metric_id = custom_metric.lower().replace(" ", "_")
-                metrics_bank.add_metric(
-                    metric_id=metric_id,
-                    name=custom_metric,
-                    description=f"Custom metric: {custom_metric}",
-                    category="Custom",
-                    source="user",
-                    usage_count=1,
+                # Use batch feedback recording (calculates and records ignored metrics)
+                metric_bank_agent.record_batch_feedback(
+                    selected_metrics=request.selected_metrics or [],
+                    custom_metrics=request.custom_metrics or [],
+                    suggested_metrics=suggested_metric_names,
+                    topic=request.topic,
                 )
 
-            # Build metric descriptions
+                # Also update legacy metrics_bank for backward compatibility
+                for metric_name in (request.selected_metrics or []):
+                    suggestions = metrics_bank.suggest_metrics(metric_name, max_results=1)
+                    if suggestions:
+                        metrics_bank.increment_usage(suggestions[0]["metric_id"])
+
+                for custom_metric in (request.custom_metrics or []):
+                    metric_id = custom_metric.lower().replace(" ", "_")
+                    metrics_bank.add_metric(
+                        metric_id=metric_id,
+                        name=custom_metric,
+                        description=f"Custom metric: {custom_metric}",
+                        category="Custom",
+                        source="user",
+                        usage_count=1,
+                    )
+            else:
+                # Fallback: old behavior if suggested_metrics not provided (backward compatibility)
+                for metric_name in (request.selected_metrics or []):
+                    metric_bank_agent.record_metric_selected(metric_name, topic=request.topic)
+                    suggestions = metrics_bank.suggest_metrics(metric_name, max_results=1)
+                    if suggestions:
+                        metrics_bank.increment_usage(suggestions[0]["metric_id"])
+
+                for custom_metric in (request.custom_metrics or []):
+                    metric_bank_agent.record_custom_metric_added(
+                        metric_name=custom_metric,
+                        topic=request.topic,
+                        description=f"Custom metric: {custom_metric}",
+                        category="Custom",
+                    )
+                    metric_id = custom_metric.lower().replace(" ", "_")
+                    metrics_bank.add_metric(
+                        metric_id=metric_id,
+                        name=custom_metric,
+                        description=f"Custom metric: {custom_metric}",
+                        category="Custom",
+                        source="user",
+                        usage_count=1,
+                    )
+
+            # Build metric descriptions from agent
             for metric_name in all_metric_names:
-                suggestions = metrics_bank.suggest_metrics(metric_name, max_results=1)
-                if suggestions:
-                    metric_descriptions[metric_name] = suggestions[0]["description"]
+                # Try to get from agent first
+                agent_metric = metric_bank_agent.get_metric_by_name(metric_name)
+                if agent_metric:
+                    metric_descriptions[metric_name] = agent_metric["description"]
+                else:
+                    # Fallback to legacy bank
+                    suggestions = metrics_bank.suggest_metrics(metric_name, max_results=1)
+                    if suggestions:
+                        metric_descriptions[metric_name] = suggestions[0]["description"]
         else:
             # Auto-generate metrics using existing MetricsGenerator
             tracker.start_step("Generate Metrics")
@@ -546,8 +600,8 @@ async def suggest_metrics(request: SuggestMetricsRequest):
     """
     Suggest relevant metrics for a research topic.
 
-    Uses ChromaDB-based metrics bank to retrieve relevant metrics
-    based on embeddings similarity search.
+    Uses adaptive Metric Bank Agent that learns from user behavior
+    to provide increasingly relevant suggestions over time.
 
     Args:
         request: SuggestMetricsRequest with topic and max_metrics
@@ -556,15 +610,47 @@ async def suggest_metrics(request: SuggestMetricsRequest):
         SuggestMetricsResponse with suggested metrics
     """
     try:
+        from ria.agents import MetricBankAgent
+        from ria.llm import LLMClient
         from ria.metrics_bank import MetricsBank
 
+        # Initialize LLM client for fresh suggestions
+        llm_client = LLMClient()
+
+        # Initialize ChromaDB metrics bank
         metrics_bank = MetricsBank()
         metrics_bank.initialize_defaults()
 
-        suggestions = metrics_bank.suggest_metrics(
+        # Initialize Metric Bank Agent with ChromaDB as initial source
+        metric_bank_agent = MetricBankAgent(
+            llm_client=llm_client,
+            chroma_metrics_bank=metrics_bank
+        )
+        metric_bank_agent.initialize_defaults()
+
+        # Get smart suggestions (includes learned behavior + fresh LLM suggestions)
+        suggestions = metric_bank_agent.get_smart_suggestions(
             topic=request.topic,
             max_results=request.max_metrics,
+            include_fresh_llm_suggestions=True,
         )
+
+        # Log metrics loading statistics
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Metric suggestions: {len(suggestions)} metrics returned")
+        logger.info(f"ChromaDB metrics in agent: {sum(1 for m in metric_bank_agent.metrics.values() if m.source == 'chroma')}")
+        logger.info(f"Adaptive metrics in agent: {sum(1 for m in metric_bank_agent.metrics.values() if m.source != 'chroma')}")
+
+        # Validate response shape: ensure all metrics have 'name' field
+        for metric in suggestions:
+            if "name" not in metric or not metric["name"]:
+                logger.error(f"Metric missing 'name' field: {metric}")
+                # Add emergency fallback
+                if "metric_name" in metric:
+                    metric["name"] = metric["metric_name"]
+                else:
+                    metric["name"] = "Unnamed Metric"
 
         return SuggestMetricsResponse(
             success=True,

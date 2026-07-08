@@ -151,6 +151,7 @@ class RankingEngine:
                     messages=messages,
                     response_model=RelevanceScore,
                     temperature=0.3,  # Lower temperature for more consistent scoring
+                    step_name="Result Ranking",
                 )
 
                 # Create scored item (exclude relevance_explanation to avoid duplicate)

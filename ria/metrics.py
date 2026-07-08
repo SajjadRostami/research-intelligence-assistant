@@ -125,6 +125,7 @@ class MetricsGenerator:
                 messages=messages,
                 response_model=MetricsListResponse,
                 temperature=0.7,
+                step_name="Metric Suggestion",
             )
 
             if not response.metrics:

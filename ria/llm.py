@@ -69,6 +69,8 @@ class LLMClient:
             report_id: Optional report ID for LangSmith trace metadata
             topic: Optional topic for LangSmith trace metadata
         """
+        # Track call sequence for auto-numbering duplicate step names
+        self._step_call_counts: dict[str, int] = {}
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         self.base_url = base_url or os.getenv("OPENAI_BASE_URL")
         self.model = model or os.getenv("LLM_MODEL", "claude-haiku")
@@ -137,6 +139,7 @@ class LLMClient:
         self,
         messages: list[dict[str, str]],
         temperature: float = 0.7,
+        step_name: Optional[str] = None,
         **kwargs: Any,
     ) -> str:
         """
@@ -145,6 +148,7 @@ class LLMClient:
         Args:
             messages: List of message dicts with 'role' and 'content' keys
             temperature: Sampling temperature (0.0 to 2.0)
+            step_name: Optional human-readable name for this LLM call (used in LangSmith traces)
             **kwargs: Additional arguments to pass to the API
 
         Returns:
@@ -166,6 +170,16 @@ class LLMClient:
         if self.langsmith_enabled and LANGSMITH_AVAILABLE:
             from langsmith.run_trees import RunTree
 
+            # Determine trace name (use step_name if provided, else default)
+            trace_name = step_name if step_name else "llm_chat"
+
+            # Make duplicate names unique by appending sequence number
+            if trace_name in self._step_call_counts:
+                self._step_call_counts[trace_name] += 1
+                trace_name = f"{trace_name} #{self._step_call_counts[trace_name]}"
+            else:
+                self._step_call_counts[trace_name] = 1
+
             # Build metadata for trace
             metadata = {
                 "workflow_name": "research_intelligence_assistant",
@@ -174,10 +188,12 @@ class LLMClient:
                 metadata["report_id"] = self.report_id
             if self.topic:
                 metadata["topic"] = self.topic
+            if step_name:
+                metadata["step_name"] = step_name
 
             # Create a RunTree for this LLM call
             run_tree = RunTree(
-                name="llm_chat",
+                name=trace_name,
                 run_type="llm",
                 inputs={"messages": messages, "temperature": temperature, "model": self.model},
                 project_name=os.getenv("LANGSMITH_PROJECT", "research-intelligence-assistant"),
@@ -234,6 +250,7 @@ class LLMClient:
         messages: list[dict[str, str]],
         response_model: type[T],
         temperature: float = 0.7,
+        step_name: Optional[str] = None,
         **kwargs: Any,
     ) -> T:
         """
@@ -246,6 +263,7 @@ class LLMClient:
             messages: List of message dicts with 'role' and 'content' keys
             response_model: Pydantic model class to parse the response into
             temperature: Sampling temperature (0.0 to 2.0)
+            step_name: Optional human-readable name for this LLM call (used in LangSmith traces)
             **kwargs: Additional arguments to pass to the API
 
         Returns:
@@ -290,6 +308,16 @@ class LLMClient:
         if self.langsmith_enabled and LANGSMITH_AVAILABLE:
             from langsmith.run_trees import RunTree
 
+            # Determine trace name (use step_name if provided, else default)
+            trace_name = step_name if step_name else "llm_chat_json"
+
+            # Make duplicate names unique by appending sequence number
+            if trace_name in self._step_call_counts:
+                self._step_call_counts[trace_name] += 1
+                trace_name = f"{trace_name} #{self._step_call_counts[trace_name]}"
+            else:
+                self._step_call_counts[trace_name] = 1
+
             # Build metadata for trace
             metadata = {
                 "workflow_name": "research_intelligence_assistant",
@@ -300,10 +328,12 @@ class LLMClient:
                 metadata["report_id"] = self.report_id
             if self.topic:
                 metadata["topic"] = self.topic
+            if step_name:
+                metadata["step_name"] = step_name
 
             # Create a RunTree for this LLM call
             run_tree = RunTree(
-                name="llm_chat_json",
+                name=trace_name,
                 run_type="llm",
                 inputs={"messages": augmented_messages, "temperature": temperature, "model": self.model},
                 project_name=os.getenv("LANGSMITH_PROJECT", "research-intelligence-assistant"),

@@ -608,8 +608,8 @@
 
             <div class="chart-row">
                 <div class="chart-container">
-                    <h4>Token Distribution by Step</h4>
-                    <canvas id="tokenPieChart"></canvas>
+                    <h4>Token Usage by Stage</h4>
+                    <canvas id="tokenBarChart"></canvas>
                 </div>
                 <div class="chart-container">
                     <h4>Prompt vs Completion Tokens</h4>
@@ -884,6 +884,11 @@
             const analyticsSource = analytics.analytics_source || analytics.source || 'Local tracker';
             const isLangSmith = analyticsSource.includes('LangSmith');
 
+            // Calculate research items
+            const papersFound = analytics.papers_found || 0;
+            const patentsFound = analytics.patents_found || 0;
+            const totalResearchItems = papersFound + patentsFound;
+
             const summaryItems = [
                 { label: 'Analytics Source', value: analyticsSource, isSource: true, highlight: isLangSmith },
                 { label: 'Current Run Duration', value: analytics.total_duration_seconds !== null ? `${analytics.total_duration_seconds?.toFixed(2)}s` : 'Not available' },
@@ -893,7 +898,9 @@
                 { label: 'Completion Tokens', value: (analytics.total_completion_tokens !== null && analytics.total_completion_tokens !== undefined) ? analytics.total_completion_tokens.toLocaleString() : 'Not available' },
                 { label: 'Estimated Cost', value: (analytics.estimated_total_cost !== null && analytics.estimated_total_cost !== undefined) ? `$${analytics.estimated_total_cost.toFixed(4)}` : 'Not available', isCost: true },
                 { label: 'Cache Status', value: analytics.cache_status || 'N/A' },
-                { label: 'Papers Found', value: analytics.papers_found || 0 }
+                { label: 'Research Items Found', value: totalResearchItems },
+                { label: 'Papers', value: papersFound },
+                { label: 'Patents', value: patentsFound }
             ];
 
             summaryItems.forEach(item => {
@@ -915,9 +922,10 @@
                 return;
             }
 
+            // Steps are already aggregated by the backend
             const steps = analytics.steps.filter(s => s.duration_seconds > 0);
 
-            // Duration by Step Chart
+            // Duration by Step Chart (horizontal bar)
             const durationCtx = document.getElementById('durationChart').getContext('2d');
             new Chart(durationCtx, {
                 type: 'bar',
@@ -941,17 +949,60 @@
                 }
             });
 
-            // Cost by Step Chart
-            const costCtx = document.getElementById('costChart').getContext('2d');
-            new Chart(costCtx, {
+            // Cost by Step Chart - check if costs are available
+            const stepsWithCost = steps.filter(s => s.estimated_cost > 0);
+            const costChartContainer = document.getElementById('costChart').parentElement;
+
+            if (stepsWithCost.length === 0) {
+                // Hide chart and show message
+                costChartContainer.innerHTML = '<div style="padding: 40px; text-align: center; color: #666;"><p>Cost per step unavailable</p><p style="font-size: 0.9em; margin-top: 10px;">LangSmith does not provide per-step cost breakdown. Total estimated cost is shown in the summary above.</p></div>';
+            } else {
+                const costCtx = document.getElementById('costChart').getContext('2d');
+                new Chart(costCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: stepsWithCost.map(s => s.step_name),
+                        datasets: [{
+                            label: 'Cost (USD)',
+                            data: stepsWithCost.map(s => s.estimated_cost),
+                            backgroundColor: 'rgba(39, 174, 96, 0.6)',
+                            borderColor: 'rgba(39, 174, 96, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        plugins: {
+                            legend: { display: false },
+                            title: { display: false }
+                        },
+                        scales: {
+                            x: {
+                                ticks: {
+                                    callback: function(value) {
+                                        return '$' + value.toFixed(4);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Token Usage by Stage (horizontal bar chart replaces pie)
+            const tokenBarCtx = document.getElementById('tokenBarChart').getContext('2d');
+            const stepsWithTokens = steps.filter(s => s.total_tokens > 0);
+
+            new Chart(tokenBarCtx, {
                 type: 'bar',
                 data: {
-                    labels: steps.map(s => s.step_name),
+                    labels: stepsWithTokens.map(s => s.step_name),
                     datasets: [{
-                        label: 'Cost (USD)',
-                        data: steps.map(s => s.estimated_cost),
-                        backgroundColor: 'rgba(39, 174, 96, 0.6)',
-                        borderColor: 'rgba(39, 174, 96, 1)',
+                        label: 'Tokens',
+                        data: stepsWithTokens.map(s => s.total_tokens),
+                        backgroundColor: 'rgba(155, 89, 182, 0.6)',
+                        borderColor: 'rgba(155, 89, 182, 1)',
                         borderWidth: 1
                     }]
                 },
@@ -966,37 +1017,10 @@
                         x: {
                             ticks: {
                                 callback: function(value) {
-                                    return '$' + value.toFixed(4);
+                                    return value.toLocaleString();
                                 }
                             }
                         }
-                    }
-                }
-            });
-
-            // Token Distribution Pie Chart
-            const tokenPieCtx = document.getElementById('tokenPieChart').getContext('2d');
-            const stepsWithTokens = steps.filter(s => s.total_tokens > 0);
-            new Chart(tokenPieCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: stepsWithTokens.map(s => s.step_name),
-                    datasets: [{
-                        data: stepsWithTokens.map(s => s.total_tokens),
-                        backgroundColor: [
-                            'rgba(52, 152, 219, 0.6)',
-                            'rgba(46, 204, 113, 0.6)',
-                            'rgba(155, 89, 182, 0.6)',
-                            'rgba(241, 196, 15, 0.6)',
-                            'rgba(231, 76, 60, 0.6)',
-                            'rgba(26, 188, 156, 0.6)'
-                        ]
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: { position: 'right' }
                     }
                 }
             });
@@ -1025,7 +1049,20 @@
                     responsive: true,
                     scales: {
                         x: { stacked: true },
-                        y: { stacked: true }
+                        y: {
+                            stacked: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toLocaleString();
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
                     }
                 }
             });
@@ -1041,24 +1078,31 @@
                 return;
             }
 
+            // Steps are already aggregated by backend
             analytics.steps.forEach(step => {
                 const stepDiv = document.createElement('div');
                 stepDiv.className = 'workflow-step';
 
                 const meta = [];
-                if (step.duration_seconds !== null) {
-                    meta.push(`${step.duration_seconds.toFixed(2)}s`);
-                }
+
+                // Show number of LLM calls first (most important for grouped view)
                 if (step.llm_calls > 0) {
                     meta.push(`${step.llm_calls} LLM call${step.llm_calls > 1 ? 's' : ''}`);
                 }
+
+                if (step.duration_seconds !== null && step.duration_seconds > 0) {
+                    meta.push(`${step.duration_seconds.toFixed(2)}s`);
+                }
+
                 if (step.total_tokens > 0) {
                     meta.push(`${step.total_tokens.toLocaleString()} tokens`);
                 }
+
                 if (step.estimated_cost > 0) {
                     meta.push(`$${step.estimated_cost.toFixed(4)}`);
                 }
 
+                // Use normalized step name from backend
                 stepDiv.innerHTML = `
                     <div class="workflow-step-icon">✅</div>
                     <div class="workflow-step-content">

@@ -166,6 +166,7 @@ class ComparisonMatrixGenerator:
                 messages=messages,
                 response_model=self._create_evaluation_response_model(metric_names),
                 temperature=0.3,
+                step_name="Comparison Matrix Generation",
             )
 
             metric_evals = metric_evaluations_response.metric_evaluations
@@ -303,21 +304,25 @@ def render_matrix_markdown(
     sorted_evals = sorted(evaluations, key=lambda e: e.overall_score, reverse=True)
 
     # Create source ID to label mapping
+    # CRITICAL: Label order must match the order evaluations were created.
+    # Evaluations are created from (patents + papers), so we label in that order.
     source_label_map = {}
     paper_counter = 1
     patent_counter = 1
 
-    if papers:
-        for paper in papers:
-            source_id = _generate_source_id_for_item(paper)
-            source_label_map[source_id] = (f"Paper {paper_counter}", f"paper-{paper_counter}", paper.title)
-            paper_counter += 1
-
+    # CRITICAL FIX: Label patents FIRST (matches evaluation generation order)
     if patents:
         for patent in patents:
             source_id = _generate_source_id_for_item(patent)
             source_label_map[source_id] = (f"Patent {patent_counter}", f"patent-{patent_counter}", patent.title)
             patent_counter += 1
+
+    # Then label papers
+    if papers:
+        for paper in papers:
+            source_id = _generate_source_id_for_item(paper)
+            source_label_map[source_id] = (f"Paper {paper_counter}", f"paper-{paper_counter}", paper.title)
+            paper_counter += 1
 
     def score_to_color_and_text(score: float) -> tuple[str, str]:
         """

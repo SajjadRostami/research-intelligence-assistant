@@ -315,11 +315,16 @@ async def generate_report(request: GenerateRequest):
             workspace_manager.save_artifact(workspace_dir, "metrics.json", [m.model_dump(mode='json') for m in metrics])
 
         # Step 5: Generate comparison matrix
+        # CRITICAL: Source order matters for consistent labeling.
+        # The matrix generator receives (patents + papers) in that order.
+        # The UI and PDF renderers MUST label sources in the same order:
+        # Patent 1, Patent 2, ..., Paper 1, Paper 2, ...
         comparison_evaluations = None
         validation_result = None
         if all_metric_names:
             tracker.start_step("Evaluate Comparison Matrix")
             matrix_generator = ComparisonMatrixGenerator(llm_client=llm_client)
+            # CRITICAL: This order (patents + papers) determines source labeling
             all_sources = ranked_results.patents + ranked_results.papers
 
             comparison_evaluations = matrix_generator.evaluate_sources(

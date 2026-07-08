@@ -128,6 +128,13 @@ class LangSmithAnalyticsProvider:
 
                 if langsmith_data:
                     # Successfully retrieved from LangSmith
+                    # Merge cache_status and data counts from fallback since LangSmith doesn't track these
+                    langsmith_data["cache_status"] = fallback_analytics.get("cache_status", "N/A")
+                    langsmith_data["papers_found"] = fallback_analytics.get("papers_found", 0)
+                    langsmith_data["patents_found"] = fallback_analytics.get("patents_found", 0)
+                    langsmith_data["open_access_papers_found"] = fallback_analytics.get("open_access_papers_found", 0)
+                    langsmith_data["cached_items_used"] = fallback_analytics.get("cached_items_used", 0)
+                    langsmith_data["fresh_items_fetched"] = fallback_analytics.get("fresh_items_fetched", 0)
                     return langsmith_data
 
                 # If not found and retries remain, wait and try again
@@ -276,6 +283,9 @@ class LangSmithAnalyticsProvider:
                     duration = (run.end_time - run.start_time).total_seconds()
                     total_duration_seconds += duration
 
+                    # Estimate per-step cost
+                    step_cost = self._estimate_cost(prompt_tokens, completion_tokens)
+
                     # Track per-step data
                     steps_data.append({
                         "step_name": run.name or "Unknown Step",
@@ -283,7 +293,7 @@ class LangSmithAnalyticsProvider:
                         "prompt_tokens": prompt_tokens,
                         "completion_tokens": completion_tokens,
                         "total_tokens": tokens,
-                        "estimated_cost": 0.0,  # Per-step cost not available from LangSmith
+                        "estimated_cost": round(step_cost, 4),
                         "llm_calls": 1,
                         "metadata": {},
                     })
@@ -301,7 +311,11 @@ class LangSmithAnalyticsProvider:
                 first_trace_id = next(iter(trace_ids))
                 trace_url = f"https://smith.langchain.com/o/{self.project_name}/projects/p/{self.project_name}/r/{first_trace_id}"
 
-            return {
+            # Aggregate steps by normalized name
+            aggregated_steps = self._aggregate_steps(steps_data)
+
+            # Build analytics dict with LangSmith data
+            analytics = {
                 "source": "LangSmith",
                 "analytics_source": "LangSmith",
                 "trace_id": next(iter(trace_ids)) if trace_ids else None,
@@ -312,16 +326,118 @@ class LangSmithAnalyticsProvider:
                 "total_tokens": total_tokens,
                 "estimated_total_cost": round(estimated_cost, 4),
                 "total_duration_seconds": round(total_duration_seconds, 2) if total_duration_seconds > 0 else None,
-                "steps": steps_data,
+                "steps": aggregated_steps,
                 # Include metadata
                 "langsmith_trace_id": next(iter(trace_ids)) if trace_ids else None,
                 "langsmith_trace_url": trace_url,
             }
 
+            return analytics
+
         except Exception as e:
             # Re-raise to let caller handle the error
             print(f"Error querying LangSmith traces: {e}")
             raise
+
+    def _normalize_step_name(self, step_name: str) -> str:
+        """
+        Normalize step name to high-level readable label.
+
+        Removes duplicate suffixes (#1, #2, etc.) and maps internal names
+        to clean UI labels.
+
+        Args:
+            step_name: Raw step name from LangSmith or tracker
+
+        Returns:
+            Normalized step name for UI display
+        """
+        # Remove trailing numbers like #1, #2, #22, etc.
+        import re
+        step_name = re.sub(r'\s*#\d+$', '', step_name)
+
+        # Map common internal names to readable labels
+        name_mappings = {
+            'llm_chat_json': 'Other LLM Steps',
+            'llm_chat': 'Other LLM Steps',
+            'Comparison Matrix Generation': 'Comparison Matrix',
+            'comparison_matrix_generation': 'Comparison Matrix',
+            'matrix_validation': 'Matrix Validation',
+            'result_ranking': 'Result Ranking',
+            'metric_suggestion': 'Metric Suggestion',
+            'executive_summary': 'Executive Summary',
+            'report_generation': 'Report Generation',
+        }
+
+        # Check exact match first (case-insensitive)
+        step_lower = step_name.lower()
+        for key, value in name_mappings.items():
+            if step_lower == key.lower():
+                return value
+
+        # Check if any mapping key is contained in the step name
+        for key, value in name_mappings.items():
+            if key.lower() in step_lower:
+                return value
+
+        # Return cleaned name if no mapping found
+        # Capitalize first letter
+        if step_name:
+            return step_name[0].upper() + step_name[1:]
+        return step_name or 'Other LLM Steps'
+
+    def _aggregate_steps(self, steps_data: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """
+        Aggregate repeated step names into grouped pipeline stages.
+
+        Groups steps by normalized name and combines their metrics.
+
+        Args:
+            steps_data: List of individual step data dicts
+
+        Returns:
+            List of aggregated step data dicts with combined metrics
+        """
+        if not steps_data:
+            return []
+
+        # Group steps by normalized name
+        aggregated: dict[str, dict[str, Any]] = {}
+
+        for step in steps_data:
+            normalized_name = self._normalize_step_name(step['step_name'])
+
+            if normalized_name not in aggregated:
+                # Initialize aggregate for this step
+                aggregated[normalized_name] = {
+                    'step_name': normalized_name,
+                    'duration_seconds': 0.0,
+                    'prompt_tokens': 0,
+                    'completion_tokens': 0,
+                    'total_tokens': 0,
+                    'estimated_cost': 0.0,
+                    'llm_calls': 0,
+                    'metadata': {},
+                }
+
+            # Accumulate metrics
+            agg = aggregated[normalized_name]
+            agg['duration_seconds'] += step.get('duration_seconds', 0.0)
+            agg['prompt_tokens'] += step.get('prompt_tokens', 0)
+            agg['completion_tokens'] += step.get('completion_tokens', 0)
+            agg['total_tokens'] += step.get('total_tokens', 0)
+            agg['estimated_cost'] += step.get('estimated_cost', 0.0)
+            agg['llm_calls'] += step.get('llm_calls', 1)
+
+        # Round aggregated values
+        for agg in aggregated.values():
+            agg['duration_seconds'] = round(agg['duration_seconds'], 2)
+            agg['estimated_cost'] = round(agg['estimated_cost'], 4)
+
+        # Sort by duration (longest first)
+        result = sorted(aggregated.values(), key=lambda x: x['duration_seconds'], reverse=True)
+
+        return result
 
     def _estimate_cost(
         self,

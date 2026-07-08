@@ -69,6 +69,93 @@ class ExecutionAnalytics:
         self.end_time = time.time()
         self.total_duration_seconds = self.end_time - self.start_time
 
+    def _normalize_step_name(self, step_name: str) -> str:
+        """
+        Normalize step name to high-level readable label.
+
+        Removes duplicate suffixes (#1, #2, etc.) and maps internal names
+        to clean UI labels.
+        """
+        import re
+        # Remove trailing numbers like #1, #2, #22, etc.
+        step_name = re.sub(r'\s*#\d+$', '', step_name)
+
+        # Map common internal names to readable labels
+        name_mappings = {
+            'llm_chat_json': 'Other LLM Steps',
+            'llm_chat': 'Other LLM Steps',
+            'Comparison Matrix Generation': 'Comparison Matrix',
+            'comparison_matrix_generation': 'Comparison Matrix',
+            'matrix_validation': 'Matrix Validation',
+            'result_ranking': 'Result Ranking',
+            'metric_suggestion': 'Metric Suggestion',
+            'executive_summary': 'Executive Summary',
+            'report_generation': 'Report Generation',
+        }
+
+        # Check exact match first (case-insensitive)
+        step_lower = step_name.lower()
+        for key, value in name_mappings.items():
+            if step_lower == key.lower():
+                return value
+
+        # Check if any mapping key is contained in the step name
+        for key, value in name_mappings.items():
+            if key.lower() in step_lower:
+                return value
+
+        # Return cleaned name if no mapping found
+        if step_name:
+            return step_name[0].upper() + step_name[1:]
+        return step_name or 'Other LLM Steps'
+
+    def _aggregate_steps(self) -> list[dict[str, Any]]:
+        """
+        Aggregate repeated step names into grouped pipeline stages.
+
+        Groups steps by normalized name and combines their metrics.
+        """
+        if not self.steps:
+            return []
+
+        # Group steps by normalized name
+        aggregated: dict[str, dict[str, Any]] = {}
+
+        for step in self.steps:
+            normalized_name = self._normalize_step_name(step.step_name)
+
+            if normalized_name not in aggregated:
+                # Initialize aggregate for this step
+                aggregated[normalized_name] = {
+                    'step_name': normalized_name,
+                    'duration_seconds': 0.0,
+                    'prompt_tokens': 0,
+                    'completion_tokens': 0,
+                    'total_tokens': 0,
+                    'estimated_cost': 0.0,
+                    'llm_calls': 0,
+                    'metadata': {},
+                }
+
+            # Accumulate metrics
+            agg = aggregated[normalized_name]
+            agg['duration_seconds'] += step.duration_seconds or 0.0
+            agg['prompt_tokens'] += step.prompt_tokens
+            agg['completion_tokens'] += step.completion_tokens
+            agg['total_tokens'] += step.total_tokens
+            agg['estimated_cost'] += step.estimated_cost
+            agg['llm_calls'] += step.llm_calls
+
+        # Round aggregated values
+        for agg in aggregated.values():
+            agg['duration_seconds'] = round(agg['duration_seconds'], 2)
+            agg['estimated_cost'] = round(agg['estimated_cost'], 4)
+
+        # Sort by duration (longest first)
+        result = sorted(aggregated.values(), key=lambda x: x['duration_seconds'], reverse=True)
+
+        return result
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
@@ -87,19 +174,7 @@ class ExecutionAnalytics:
             "papers_found": self.papers_found,
             "patents_found": self.patents_found,
             "open_access_papers_found": self.open_access_papers_found,
-            "steps": [
-                {
-                    "step_name": step.step_name,
-                    "duration_seconds": round(step.duration_seconds, 2) if step.duration_seconds else None,
-                    "prompt_tokens": step.prompt_tokens,
-                    "completion_tokens": step.completion_tokens,
-                    "total_tokens": step.total_tokens,
-                    "estimated_cost": round(step.estimated_cost, 4),
-                    "llm_calls": step.llm_calls,
-                    "metadata": step.metadata,
-                }
-                for step in self.steps
-            ],
+            "steps": self._aggregate_steps(),
             "langsmith_trace_id": self.langsmith_trace_id,
             "langsmith_trace_url": self.langsmith_trace_url,
         }

@@ -498,6 +498,7 @@ class ComparisonAgent:
                 messages=messages,
                 response_model=ValidationResponse,
                 temperature=0.2,
+                step_name="Matrix Validation",
             )
 
             # Track LLM call

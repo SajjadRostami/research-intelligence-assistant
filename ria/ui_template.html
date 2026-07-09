@@ -1218,6 +1218,8 @@
         }
 
         function backToStep1() {
+            suggestedMetrics = [];
+            selectedMetricNames = [];
             document.getElementById('step2').classList.add('hidden');
             document.getElementById('step1').classList.remove('hidden');
         }
@@ -1228,6 +1230,7 @@
             document.getElementById('useCacheMode').checked = true;
             selectedMetricNames = [];
             customMetrics = [];
+            suggestedMetrics = [];
             currentReportData = null;  // Clear report data
             document.getElementById('step2').classList.add('hidden');
             document.getElementById('step1').classList.remove('hidden');

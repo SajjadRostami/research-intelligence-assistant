@@ -29,6 +29,14 @@ from ria.llm import LLMClient
 logger = logging.getLogger(__name__)
 
 
+class TopicUsageStats(BaseModel):
+    """Per-topic usage statistics."""
+
+    selected_count: int = 0
+    ignored_count: int = 0
+    last_used_at: Optional[str] = None
+
+
 class MetricUsageData(BaseModel):
     """Usage tracking data for a single metric."""
 
@@ -38,10 +46,13 @@ class MetricUsageData(BaseModel):
     category: str
     source: Literal["default", "chroma", "llm_suggested", "user_custom", "learned"]
 
-    # Topic tracking
+    # Topic tracking (for backward compatibility and simple topic list)
     topics_used: list[str] = Field(default_factory=list)
 
-    # Usage counts
+    # Per-topic usage statistics (new, topic-aware learning)
+    topic_stats: dict[str, TopicUsageStats] = Field(default_factory=dict)
+
+    # Usage counts (global, for backward compatibility)
     selected_count: int = 0
     rejected_count: int = 0
     custom_added_count: int = 0
@@ -290,10 +301,11 @@ class MetricBankAgent:
         """
         Get smart metric suggestions based on topic and learned user behavior.
 
-        Combines:
-        - High-scoring learned metrics
-        - Topic-relevant default metrics
-        - Fresh LLM-generated suggestions (if enabled)
+        Strategy:
+        1. Query ChromaDB for topic-relevant metrics (semantic similarity)
+        2. Score all metrics with topic relevance as primary factor
+        3. Add fresh LLM suggestions if enabled
+        4. Return top-scored, topic-relevant metrics
 
         Args:
             topic: Research topic for context
@@ -303,51 +315,115 @@ class MetricBankAgent:
         Returns:
             List of metric suggestion dictionaries, sorted by relevance
         """
-        logger.info(f"Getting smart suggestions for topic: {topic}")
+        logger.info(f"Getting smart suggestions for topic: '{topic}'")
 
-        # Calculate scores for all active metrics
+        # Step 1: Get topic-relevant metrics from ChromaDB
+        chroma_candidates = self._get_chroma_topic_candidates(topic, max_results=max_results * 3)
+
+        logger.info(f"ChromaDB query topic: '{topic}'")
+        logger.info(f"Retrieved {len(chroma_candidates)} ChromaDB candidates")
+        if chroma_candidates:
+            logger.info(f"Top 3 ChromaDB candidates:")
+            for i, c in enumerate(chroma_candidates[:3]):
+                logger.info(f"  {i+1}. {c['name']}: topic_rel={c.get('topic_relevance_score', 0):.3f}")
+
+        # Step 2: Build topic relevance map from ChromaDB results
+        topic_relevance_map = {}
+        for candidate in chroma_candidates:
+            metric_name = candidate["name"]
+            topic_relevance_map[metric_name] = candidate.get("topic_relevance_score", 0.5)
+
+        # Step 3: Score all active metrics
         scored_metrics = []
         for metric in self.metrics.values():
             if not metric.is_active:
                 continue
 
-            # Calculate final score
-            final_score = self._calculate_metric_score(metric, topic)
+            # Get topic relevance score
+            topic_relevance_score = topic_relevance_map.get(metric.metric_name, 0.0)
+
+            # Calculate final score with topic relevance as primary factor
+            final_score = self._calculate_metric_score_with_topic(
+                metric, topic, topic_relevance_score
+            )
+
+            # Log detailed scoring for top candidates (only first 15 to avoid spam)
+            if len(scored_metrics) < 15:
+                logger.debug(
+                    f"Scored: {metric.metric_name}: "
+                    f"topic_rel={topic_relevance_score:.3f}, "
+                    f"final={final_score:.3f}, "
+                    f"selected_count={metric.selected_count}"
+                )
 
             scored_metrics.append({
-                "name": metric.metric_name,  # UI expects "name", not "metric_name"
+                "name": metric.metric_name,
                 "description": metric.description,
                 "category": metric.category,
                 "source": metric.source,
-                "score": final_score,  # Add unified score field for UI
+                "score": final_score,  # UI backward compatibility
+                "topic_relevance_score": topic_relevance_score,
+                "final_score": final_score,
                 "selected_count": metric.selected_count,
                 "custom_added_count": metric.custom_added_count,
                 "priority_score": metric.priority_score,
-                "final_score": final_score,
                 "reason": self._generate_suggestion_reason(metric, topic),
             })
 
-        # Sort by final score
+        # Sort by final score (topic relevance is primary)
         scored_metrics.sort(key=lambda x: x["final_score"], reverse=True)
+
+        # Log top suggestions for debugging
+        logger.info(f"Top 10 scored metrics for topic '{topic}':")
+        for i, m in enumerate(scored_metrics[:10]):
+            logger.info(
+                f"  {i+1}. {m['name']}: final={m['final_score']:.3f}, "
+                f"topic_rel={m['topic_relevance_score']:.3f}, "
+                f"selected={m['selected_count']}, source={m['source']}"
+            )
 
         # Take top results
         top_suggestions = scored_metrics[:max_results]
 
-        # Optionally add fresh LLM suggestions
-        if include_fresh_llm_suggestions and self.llm:
+        # Step 4: Add fresh LLM suggestions if needed
+        should_generate_llm = include_fresh_llm_suggestions
+
+        # AUTOMATIC FALLBACK: If ChromaDB has poor coverage for this topic, generate LLM suggestions
+        if not should_generate_llm:
+            # Check if we have enough high-relevance metrics
+            high_relevance_count = sum(1 for m in top_suggestions if m.get('topic_relevance_score', 0) >= 0.5)
+            if high_relevance_count < max(3, max_results // 2):
+                logger.info(
+                    f"Only {high_relevance_count} high-relevance metrics found for '{topic}'. "
+                    f"Generating fresh LLM suggestions as fallback."
+                )
+                should_generate_llm = True
+
+        if should_generate_llm and self.llm:
             try:
+                existing_names = [m["name"] for m in top_suggestions]
                 llm_suggestions = self._generate_llm_suggestions(
                     topic=topic,
-                    existing_metrics=[m["metric_name"] for m in top_suggestions],
-                    max_suggestions=min(3, max_results // 3),  # Add ~1/3 fresh suggestions
+                    existing_metrics=existing_names,
+                    max_suggestions=min(5, max_results // 2),  # Increased from 3
                 )
 
-                # Merge LLM suggestions
+                # Merge LLM suggestions with HIGH topic relevance score
                 for llm_metric in llm_suggestions:
-                    # Check if already exists
                     normalized = self._normalize_metric_name(llm_metric["name"])
-                    if not any(self._normalize_metric_name(m["name"]) == normalized for m in top_suggestions):
+                    if not any(
+                        self._normalize_metric_name(m["name"]) == normalized
+                        for m in top_suggestions
+                    ):
+                        # LLM suggestions for a NEW topic are HIGHLY relevant by definition
+                        llm_metric["topic_relevance_score"] = 0.95  # Very high (was 0.9)
+                        llm_metric["final_score"] = 0.95 * 0.70  # Use new topic weight formula
                         top_suggestions.append(llm_metric)
+
+                logger.info(f"Added {len(llm_suggestions)} fresh LLM suggestions")
+
+                # Re-sort after adding LLM suggestions
+                top_suggestions.sort(key=lambda x: x.get("final_score", 0), reverse=True)
 
             except Exception as e:
                 logger.warning(f"Failed to generate LLM suggestions: {e}")
@@ -378,17 +454,28 @@ class MetricBankAgent:
         if existing:
             metric = self.metrics[existing]
             metric.selected_count += 1
-            metric.last_selected_at = datetime.utcnow().isoformat()
+            now = datetime.utcnow().isoformat()
+            metric.last_selected_at = now
 
             # Add topic if not already tracked
             if topic not in metric.topics_used:
                 metric.topics_used.append(topic)
 
+            # Update per-topic statistics
+            normalized_topic = self._normalize_topic(topic)
+            if normalized_topic not in metric.topic_stats:
+                metric.topic_stats[normalized_topic] = TopicUsageStats()
+            metric.topic_stats[normalized_topic].selected_count += 1
+            metric.topic_stats[normalized_topic].last_used_at = now
+
             # Increase priority and confidence
             metric.priority_score = min(1.0, metric.priority_score + 0.1)
             metric.confidence_score = min(1.0, metric.confidence_score + 0.05)
 
-            logger.info(f"Recorded selection: {metric_name} (count: {metric.selected_count})")
+            logger.info(
+                f"Recorded selection: {metric_name} (global: {metric.selected_count}, "
+                f"topic '{normalized_topic}': {metric.topic_stats[normalized_topic].selected_count})"
+            )
         else:
             # Metric not found, log warning
             logger.warning(f"Metric not found for selection: {metric_name}")
@@ -423,11 +510,19 @@ class MetricBankAgent:
             metric = self.metrics[existing]
             metric.custom_added_count += 1
             metric.selected_count += 1  # Also count as a selection
-            metric.last_selected_at = datetime.utcnow().isoformat()
+            now = datetime.utcnow().isoformat()
+            metric.last_selected_at = now
 
             # Add topic
             if topic not in metric.topics_used:
                 metric.topics_used.append(topic)
+
+            # Update per-topic statistics
+            normalized_topic = self._normalize_topic(topic)
+            if normalized_topic not in metric.topic_stats:
+                metric.topic_stats[normalized_topic] = TopicUsageStats()
+            metric.topic_stats[normalized_topic].selected_count += 1
+            metric.topic_stats[normalized_topic].last_used_at = now
 
             # Significantly boost priority and confidence
             metric.priority_score = min(1.0, metric.priority_score + 0.2)
@@ -459,7 +554,8 @@ class MetricBankAgent:
         """
         Record that a user was shown a metric but did not select it.
 
-        After repeated ignores, the metric is deprioritized or deactivated.
+        After repeated ignores FOR THE SAME TOPIC, the metric is deprioritized.
+        Global ignores are tracked lightly.
 
         Args:
             metric_name: Name of the ignored metric
@@ -472,15 +568,26 @@ class MetricBankAgent:
             metric = self.metrics[existing]
             metric.rejected_count += 1
 
-            # Decrease priority (but not too aggressively)
-            metric.priority_score = max(0.0, metric.priority_score - 0.05)
+            # Update per-topic statistics
+            normalized_topic = self._normalize_topic(topic)
+            if normalized_topic not in metric.topic_stats:
+                metric.topic_stats[normalized_topic] = TopicUsageStats()
+            metric.topic_stats[normalized_topic].ignored_count += 1
 
-            # Deactivate if ignored too many times
+            # Light global penalty (reduced from -0.05 to -0.02)
+            metric.priority_score = max(0.0, metric.priority_score - 0.02)
+
+            # Deactivate only if ignored globally too many times
             if metric.rejected_count >= self.IGNORE_THRESHOLD:
                 metric.is_active = False
-                logger.info(f"Deactivated metric: {metric_name} (rejected {metric.rejected_count} times)")
+                logger.info(
+                    f"Deactivated metric: {metric_name} (globally rejected {metric.rejected_count} times)"
+                )
             else:
-                logger.debug(f"Recorded ignore: {metric_name} (count: {metric.rejected_count})")
+                logger.debug(
+                    f"Recorded ignore: {metric_name} (global: {metric.rejected_count}, "
+                    f"topic '{normalized_topic}': {metric.topic_stats[normalized_topic].ignored_count})"
+                )
 
         self._save()
 
@@ -612,60 +719,120 @@ class MetricBankAgent:
 
         return False
 
-    def _calculate_metric_score(self, metric: MetricUsageData, topic: str) -> float:
+    def _calculate_metric_score_with_topic(
+        self, metric: MetricUsageData, topic: str, topic_relevance_score: float
+    ) -> float:
         """
-        Calculate final score for a metric based on usage and topic relevance.
+        Calculate final score for a metric with topic relevance as primary factor.
 
         Formula:
-            final_score = priority_score
-                        + selected_count_weight
-                        + custom_added_weight
-                        + recent_usage_weight
-                        - rejected_penalty
+            final_score = 0.55 * topic_relevance_score
+                        + 0.25 * adaptive_usage_score
+                        + 0.15 * recent_topic_usage_score
+                        + 0.05 * freshness_score
+                        - topic_specific_penalty
+                        - light_global_penalty
 
         Args:
             metric: Metric usage data
             topic: Current research topic
+            topic_relevance_score: Semantic relevance score from ChromaDB (0.0-1.0)
 
         Returns:
-            Final score (higher is better)
+            Final score (0.0-1.0, higher is better)
         """
-        # Base priority score
-        score = metric.priority_score
+        import math
 
-        # Selected count weight (logarithmic to avoid over-weighting)
-        if metric.selected_count > 0:
-            import math
-            score += min(0.5, math.log10(metric.selected_count + 1) * 0.2)
+        normalized_topic = self._normalize_topic(topic)
 
-        # Custom added weight (strong signal)
-        if metric.custom_added_count > 0:
-            import math
-            score += min(0.6, math.log10(metric.custom_added_count + 1) * 0.3)
+        # Initialize penalty
+        penalty = 0.0
 
-        # Recent usage weight
-        if metric.last_selected_at:
+        # 1. Topic relevance score (70% weight - INCREASED from 55%) - PRIMARY FACTOR
+        topic_component = 0.70 * topic_relevance_score
+
+        # Penalty for very low topic relevance (only if metric has no topic-specific history)
+        # This prevents globally popular but completely unrelated metrics from ranking high
+        if topic_relevance_score < 0.15:  # Very low relevance threshold (reduced from 0.25)
+            if normalized_topic not in metric.topic_stats or \
+               metric.topic_stats[normalized_topic].selected_count == 0:
+                # Apply moderate penalty for very low relevance without topic history
+                penalty += 0.20  # Reduced from 0.3
+
+        # 2. Adaptive usage score (15% weight - REDUCED from 25%) - topic-aware learning
+        # PRIMARY: Use topic-specific stats
+        adaptive_score = 0.0
+
+        if normalized_topic in metric.topic_stats:
+            # Strong boost for same/similar topic
+            topic_stat = metric.topic_stats[normalized_topic]
+            if topic_stat.selected_count > 0:
+                adaptive_score = min(1.0, math.log10(topic_stat.selected_count + 1) * 0.5)
+        else:
+            # FALLBACK: Only use global usage if topics are VERY similar
+            if metric.selected_count > 0:
+                similar_topic_boost = self._get_similar_topic_boost(metric, topic)
+                # Require 60%+ word overlap for cross-topic boost (was: any > 0)
+                if similar_topic_boost >= 0.6:
+                    # Smaller boost for cross-topic usage (0.15 factor instead of 0.2)
+                    adaptive_score = min(0.3, math.log10(metric.selected_count + 1) * 0.15)
+
+        adaptive_component = 0.15 * adaptive_score
+
+        # 3. Recent topic usage score (10% weight - REDUCED from 15%)
+        recent_topic_score = 0.0
+        if normalized_topic in metric.topic_stats:
+            topic_stat = metric.topic_stats[normalized_topic]
+            if topic_stat.last_used_at:
+                try:
+                    last_used = datetime.fromisoformat(topic_stat.last_used_at)
+                    days_since = (datetime.utcnow() - last_used).days
+
+                    if days_since < self.RECENCY_WEIGHT_DAYS:
+                        recent_topic_score = 1.0 - (days_since / self.RECENCY_WEIGHT_DAYS)
+                except Exception:
+                    pass
+
+        recent_component = 0.10 * recent_topic_score
+
+        # 4. Freshness score (5% weight) - slight boost for recently suggested
+        freshness_score = 0.0
+        if metric.last_suggested_at:
             try:
-                last_selected = datetime.fromisoformat(metric.last_selected_at)
-                days_since = (datetime.utcnow() - last_selected).days
+                last_suggested = datetime.fromisoformat(metric.last_suggested_at)
+                days_since = (datetime.utcnow() - last_suggested).days
 
-                if days_since < self.RECENCY_WEIGHT_DAYS:
-                    recency_boost = 0.3 * (1.0 - days_since / self.RECENCY_WEIGHT_DAYS)
-                    score += recency_boost
+                if days_since < 7:  # Within last week
+                    freshness_score = 1.0 - (days_since / 7.0)
             except Exception:
                 pass
 
-        # Topic relevance boost
-        if topic in metric.topics_used:
-            score += 0.4
+        freshness_component = 0.05 * freshness_score
 
-        # Rejected penalty
+        # 5. Topic-specific penalties (already initialized above)
+        # Heavy penalty for metrics ignored for THIS topic
+        if normalized_topic in metric.topic_stats:
+            topic_stat = metric.topic_stats[normalized_topic]
+            if topic_stat.ignored_count > 0:
+                # Strong topic-specific penalty
+                penalty += min(0.3, topic_stat.ignored_count * 0.05)
+
+        # Light penalty for global ignores
         if metric.rejected_count > 0:
-            import math
-            penalty = min(0.5, math.log10(metric.rejected_count + 1) * 0.15)
-            score -= penalty
+            penalty += min(0.1, math.log10(metric.rejected_count + 1) * 0.03)
 
-        return max(0.0, score)
+        final_score = (
+            topic_component + adaptive_component + recent_component + freshness_component - penalty
+        )
+
+        return max(0.0, min(1.0, final_score))
+
+    def _calculate_metric_score(self, metric: MetricUsageData, topic: str) -> float:
+        """
+        Legacy scoring method for backward compatibility.
+        Uses the new topic-aware scoring with default topic relevance.
+        """
+        return self._calculate_metric_score_with_topic(metric, topic, topic_relevance_score=0.3)
 
     def _generate_suggestion_reason(self, metric: MetricUsageData, topic: str) -> str:
         """Generate a human-readable reason for suggesting a metric."""
@@ -771,6 +938,123 @@ class MetricBankAgent:
 
         except Exception as e:
             logger.error(f"Failed to generate LLM suggestions: {e}")
+            return []
+
+    def _normalize_topic(self, topic: str) -> str:
+        """
+        Normalize a topic string for comparison and storage.
+
+        Args:
+            topic: Original topic string
+
+        Returns:
+            Normalized topic (lowercase, cleaned)
+        """
+        import re
+
+        normalized = topic.lower().strip()
+        normalized = re.sub(r'[^\w\s-]', ' ', normalized)
+        normalized = re.sub(r'\s+', ' ', normalized).strip()
+        return normalized
+
+    def _get_similar_topic_boost(self, metric: MetricUsageData, current_topic: str) -> float:
+        """
+        Calculate boost based on similarity between current topic and past topics.
+
+        Args:
+            metric: Metric to check
+            current_topic: Current research topic
+
+        Returns:
+            Boost factor (0.0-1.0)
+        """
+        if not metric.topics_used:
+            return 0.0
+
+        current_words = set(self._normalize_topic(current_topic).split())
+        if not current_words:
+            return 0.0
+
+        max_similarity = 0.0
+        for past_topic in metric.topics_used:
+            past_words = set(self._normalize_topic(past_topic).split())
+            if not past_words:
+                continue
+
+            # Jaccard similarity
+            intersection = len(current_words & past_words)
+            union = len(current_words | past_words)
+
+            if union > 0:
+                similarity = intersection / union
+                max_similarity = max(max_similarity, similarity)
+
+        return max_similarity
+
+    def _get_chroma_topic_candidates(
+        self, topic: str, max_results: int = 30
+    ) -> list[dict[str, Any]]:
+        """
+        Query ChromaDB for topic-relevant metrics.
+
+        Args:
+            topic: Research topic
+            max_results: Maximum number of candidates to retrieve
+
+        Returns:
+            List of candidate metrics with topic_relevance_score
+        """
+        if not self.chroma_metrics_bank:
+            logger.debug("No ChromaDB metrics bank available")
+            return []
+
+        try:
+            from ria.metrics_bank import MetricsBank
+
+            if not isinstance(self.chroma_metrics_bank, MetricsBank):
+                logger.warning("Invalid ChromaDB metrics bank instance")
+                return []
+
+            # Query ChromaDB with the topic
+            chroma_results = self.chroma_metrics_bank.collection.query(
+                query_texts=[topic], n_results=min(max_results, self.chroma_metrics_bank.collection.count())
+            )
+
+            if not chroma_results["ids"] or not chroma_results["ids"][0]:
+                logger.warning("No ChromaDB results for topic")
+                return []
+
+            candidates = []
+            for i, metric_id in enumerate(chroma_results["ids"][0]):
+                metadata = chroma_results["metadatas"][0][i]
+                distance = chroma_results["distances"][0][i] if "distances" in chroma_results else 1.0
+
+                # Convert distance to similarity score (ChromaDB uses cosine distance)
+                # Distance typically ranges from 0.0 (identical) to 2.0 (opposite)
+                # Convert to 0.0-1.0 similarity score
+                similarity = max(0.0, 1.0 - (distance / 2.0))
+
+                candidates.append({
+                    "metric_id": metric_id,
+                    "name": metadata["name"],
+                    "description": metadata["description"],
+                    "category": metadata.get("category", "General"),
+                    "source": "chroma",
+                    "topic_relevance_score": similarity,
+                })
+
+            logger.info(
+                f"ChromaDB returned {len(candidates)} candidates, "
+                f"top score: {candidates[0]['topic_relevance_score']:.3f}"
+            )
+
+            return candidates
+
+        except Exception as e:
+            logger.error(f"Failed to query ChromaDB for topic candidates: {e}")
+            import traceback
+
+            traceback.print_exc()
             return []
 
     def _normalize_metric_name(self, name: str) -> str:
@@ -1017,10 +1301,18 @@ class MetricBankAgent:
                     self.metrics = {}
                     return
 
-            self.metrics = {
-                key: MetricUsageData.model_validate(value)
-                for key, value in data.items()
-            }
+            # Load metrics with backward compatibility
+            self.metrics = {}
+            for key, value in data.items():
+                # Ensure topic_stats exists (backward compatibility)
+                if "topic_stats" not in value:
+                    value["topic_stats"] = {}
+
+                try:
+                    self.metrics[key] = MetricUsageData.model_validate(value)
+                except Exception as e:
+                    logger.warning(f"Failed to load metric {key}: {e}. Skipping.")
+                    continue
 
             logger.info(f"Loaded {len(self.metrics)} metrics from adaptive storage")
         except json.JSONDecodeError as e:

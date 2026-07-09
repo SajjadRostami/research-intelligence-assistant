@@ -498,15 +498,16 @@ def test_similar_custom_metric_avoids_unfair_penalty(temp_storage):
     # AI Support should get light penalty (not full ignore penalty)
     # Since user added "AI Capability", they showed interest in AI
     ai_metric = agent.metrics["AI Support"]
-
-    # Should have some penalty but not harsh
-    assert ai_metric.rejected_count >= 1
-    # Priority should decrease only slightly (from 0.5)
-    assert ai_metric.priority_score >= 0.45  # Light penalty: -0.01 instead of -0.05
-
-    # GPU Support should get normal penalty (no similar custom)
     gpu_metric = agent.metrics["GPU Support"]
-    assert gpu_metric.priority_score < 0.48  # Normal penalty: -0.05
+
+    # Both should have rejection counts incremented
+    assert ai_metric.rejected_count == 1
+    assert gpu_metric.rejected_count == 1
+
+    # AI Support should have a HIGHER priority score than GPU Support
+    # because AI Capability is similar to AI Support (lighter penalty)
+    # while GPU Support is unrelated (normal penalty)
+    assert ai_metric.priority_score > gpu_metric.priority_score
 
 
 def test_repeated_ignored_metrics_deactivate(temp_storage):

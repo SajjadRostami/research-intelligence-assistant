@@ -1,4 +1,4 @@
-# Research Intelligence Assistant
+# ARIA: AI-Powered Research Intelligence Assistant
 
 A Python-based assistant that generates structured benchmark reports from a research topic by collecting papers, patents, metrics, comparison matrices, analytics, and exportable reports.
 

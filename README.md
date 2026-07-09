@@ -9,7 +9,7 @@ A Python-based assistant that generates structured benchmark reports from a rese
 ## Key Features
 
 - Scientific paper and patent retrieval
-- Adaptive metric suggestions using ChromaDB and user feedback
+- Topic-aware metric suggestions that adapt based on research topic and learn from user behavior (selected, custom-added, and ignored metrics)
 - Source ranking and comparison matrix generation
 - Agent-based matrix validation (Metric Bank Agent + Comparison Agent)
 - PDF report export with visual heatmaps
@@ -22,7 +22,7 @@ A Python-based assistant that generates structured benchmark reports from a rese
 
 The application uses a two-agent structure:
 
-- **Metric Bank Agent**: Manages adaptive metric suggestions using ChromaDB and learns from user behavior
+- **Metric Bank Agent**: Provides topic-aware metric suggestions using ChromaDB as the base metric bank, dynamically adapting to the current research topic and learning from selected, custom-added, and ignored metrics
 - **Comparison Agent**: Validates and improves comparison matrix cells using rule-based and LLM validation
 
 The pipeline coordinates search, ranking, matrix generation, validation, analytics tracking, and PDF export.
